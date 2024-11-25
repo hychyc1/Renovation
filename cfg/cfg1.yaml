@@ -1,8 +1,8 @@
 # reward
 reward_specs:
-  dis_weight: 0.5
-  cost_weight: 0.5
-  build_ration: 0.5
+  monetray_weight: 0.5
+  transportation_weight: 0.5
+  POI_weight: 0.5
 
 # agent
 agent_specs:

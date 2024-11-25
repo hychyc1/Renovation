@@ -1,8 +1,179 @@
 import numpy as np
+from utils.calc_mean_transportation import calc_mean_transportation
+class RenovationEnv:
+    def __init__(self, cfg):
+        """
+        Initializes the environment.
 
-class Grid(object):
-    def __init__(self):
-        super.__init__()
-        self.state = 
+        Args:
+        - cfg (object): Configuration object containing:
+            - cfg.n (int): Number of rows in the grid.
+            - cfg.m (int): Number of columns in the grid.
+            - cfg.grid_attributes (dict): Grid attributes with keys:
+                - "pop" (np.ndarray): Population distribution on the grid.
+                - "road" (np.ndarray): Road network importance on the grid.
+                - "price_c" (np.ndarray): Commercial property prices on the grid.
+                - "price_r" (np.ndarray): Rental property prices on the grid.
+                - "POI" (np.ndarray): Points of Interest (POI) values on the grid.
+                - "AREA" (np.ndarray): Available area for renovation on the grid.
+                - "r_b" (np.ndarray): Baseline adjustment factor for the grid.
+                - "rent_area" (np.ndarray): Rentable area distribution on the grid.
+            - cfg.plot_ratio (float): Plot ratio for renovation costs.
+            - cfg.POI_plot_ratio (float): POI plot ratio for renovation costs.
+            - cfg.monetary_compensation_ratio (float): Compensation ratio for renovation costs.
+            - cfg.speed_c (float): Annual increase rate for commercial prices.
+            - cfg.speed_r (float): Annual increase rate for rental prices.
+            - cfg.max_yr (int): Maximum number of years before termination.
+            - cfg.POI_affect_range (int): Range within which POI affects property prices.
+            - cfg.inflation_rate (float): Annual inflation rate.
+            - cfg.space_per_person (float): Space required per person.
+            - cfg.occupation_rate (float): Occupation rate for rental properties.
+            - cfg.combinations (list of tuples): List of combinations as (r_c, r_r, r_poi).
+            - cfg.FAR_values (list of float): List of FAR values.
+            - cfg.monetary_weight (float): Weight applied to monetary rewards.
+            - cfg.transportation_weight (float): Weight applied to transportation rewards.
+            - cfg.POI_weight (float): Weight applied to POI rewards.
+        """
+        self.n = cfg.n
+        self.m = cfg.m
+        self.original_state = {key: value.copy() for key, value in cfg.grid_attributes.items()}
+        self.current_state = {key: value.copy() for key, value in cfg.grid_attributes.items()}
 
-    
+        # Global parameters
+        self.plot_ratio = cfg.plot_ratio
+        self.POI_plot_ratio = cfg.POI_plot_ratio
+        self.monetary_compensation_ratio = cfg.monetary_compensation_ratio
+        self.speed_c = cfg.speed_c
+        self.speed_r = cfg.speed_r
+        self.max_yr = cfg.max_yr
+        self.POI_affect_range = cfg.POI_affect_range
+        self.inflation_rate = cfg.inflation_rate
+        self.space_per_person = cfg.space_per_person
+        self.occupation_rate = cfg.occupation_rate
+        self.combinations = cfg.combinations
+        self.FAR_values = cfg.FAR_values
+
+        # Reward weights
+        self.monetary_weight = cfg.monetary_weight
+        self.transportation_weight = cfg.transportation_weight
+        self.POI_weight = cfg.POI_weight
+
+        # Counter
+        self.current_year = 0
+
+    def reset(self):
+        """
+        Resets the environment to its initial state.
+
+        Returns:
+        - state (dict): The initial state of the grid, including all attributes.
+        """
+        self.current_state = {key: value.copy() for key, value in self.original_state.items()}
+        self.current_year = 0
+        return self.current_state
+
+    def step(self, actions):
+        """
+        Executes a step in the environment based on the given actions.
+
+        Args:
+        - actions (list of tuples): Each tuple represents a renovation action as (i, j, comb, f),
+                                    where i, j are grid indices, comb is a renovation combination index,
+                                    and f is a FAR value index.
+
+        Returns:
+        - next_state (dict): The updated grid attributes after the actions.
+        - reward (float): The total reward from this step.
+        - done (bool): Whether the episode has ended.
+        - info (dict): Additional information (e.g., breakdown of rewards).
+        """
+        grid = self.current_state
+        old_population = grid["pop"].copy()
+        old_POI = grid["POI"].copy()
+
+        # Calculate rewards
+        R_M = 0  # Monetary reward
+        for i, j, comb, f in actions:
+            # Renovation parameters
+            r_c, r_r, r_poi = self.combinations[comb]
+            FAR = self.FAR_values[f]
+            AREA = grid["AREA"][i, j]
+            r_b = grid["r_b"][i, j]
+
+            # Sell and rent areas
+            sell_space = AREA * FAR * r_c * r_b
+            rent_space = AREA * FAR * r_r * r_b
+            POI_space = AREA * r_poi * r_b
+
+            # Update grid attributes
+            grid["AREA"][i, j] = 0  # No area left to renovate
+            grid["pop"][i, j] += sell_space / self.space_per_person + self.occupation_rate * rent_space / self.space_per_person
+            grid["POI"][i, j] += POI_space
+
+            # Monetary reward components
+            sell_reward = sell_space * grid["price_c"][i, j]
+            rent_reward = rent_space * grid["price_r"][i, j] * 12  # Annual rent revenue
+            cost = (
+                AREA * self.plot_ratio * self.monetary_compensation_ratio * grid["price_c"][i, j]
+                + POI_space * self.POI_plot_ratio * grid["price_c"][i, j]
+            )
+            R_M += sell_reward + rent_reward - cost
+
+            # Adjust adjacent grids' prices
+            self.update_adjacent_prices(i, j, grid, old_POI)
+
+        # Global changes
+        self.current_year += 1
+        grid["price_c"] *= 1 + self.speed_c
+        grid["price_r"] *= 1 + self.speed_r
+        grid["price_c"] /= 1 + self.inflation_rate
+        grid["price_r"] /= 1 + self.inflation_rate
+
+        # Transportation reward
+        R_T = calc_mean_transportation(grid["pop"]) - calc_mean_transportation(old_population)
+
+        # POI reward
+        avg_POI_new = grid["POI"].sum() / grid["pop"].sum()
+        avg_POI_old = old_POI.sum() / old_population.sum()
+        R_P = avg_POI_new - avg_POI_old
+
+        # Apply reward weights
+        weighted_R_M = self.monetary_weight * R_M
+        weighted_R_T = self.transportation_weight * R_T
+        weighted_R_P = self.POI_weight * R_P
+
+        # Total reward
+        total_reward = weighted_R_M + weighted_R_T + weighted_R_P
+
+        # Check if the episode is done
+        done = self.current_year >= self.max_yr
+
+        # Return next state, reward, done, and info
+        return grid, total_reward, done, {
+            "R_M": R_M,
+            "R_T": R_T,
+            "R_P": R_P,
+            "weighted_R_M": weighted_R_M,
+            "weighted_R_T": weighted_R_T,
+            "weighted_R_P": weighted_R_P,
+        }
+
+    def update_adjacent_prices(self, i, j, grid, old_POI):
+        """
+        Updates the prices of adjacent grids within the POI affect range.
+
+        Args:
+        - i, j (int): Indices of the renovated grid.
+        - grid (dict): Current grid attributes.
+        - old_POI (numpy array): POI values before renovation.
+        """
+        for x in range(max(0, i - self.POI_affect_range), min(self.n, i + self.POI_affect_range + 1)):
+            for y in range(max(0, j - self.POI_affect_range), min(self.m, j + self.POI_affect_range + 1)):
+                if (x, y) != (i, j):
+                    POI_before = old_POI[max(0, x - self.POI_affect_range):min(self.n, x + self.POI_affect_range + 1),
+                                         max(0, y - self.POI_affect_range):min(self.m, y + self.POI_affect_range + 1)].sum()
+                    POI_after = grid["POI"][max(0, x - self.POI_affect_range):min(self.n, x + self.POI_affect_range + 1),
+                                             max(0, y - self.POI_affect_range):min(self.m, y + self.POI_affect_range + 1)].sum()
+                    if POI_before > 0:
+                        grid["price_c"][x, y] *= POI_after / POI_before
+                        grid["price_r"][x, y] *= POI_after / POI_before

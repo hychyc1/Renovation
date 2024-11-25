@@ -3,7 +3,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from policy import PolicyHead
+from state_encoder import CNNStateEncoder
 from value import ValueNetwork
+import numpy as np
 
 class PPOAgent:
     def __init__(self, cfg, env):
@@ -20,6 +22,7 @@ class PPOAgent:
         # Initialize networks
         self.policy_net = PolicyHead(cfg)
         self.value_net = ValueNetwork(cfg.feature_dim)
+        self.state_encoder = CNNStateEncoder(cfg.num_params, cfg.feature_dim)
 
         # Optimizers
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=cfg.policy_lr)
@@ -32,6 +35,20 @@ class PPOAgent:
         self.value_loss_coef = cfg.value_loss_coef
         self.batch_size = cfg.batch_size
         self.num_epochs = cfg.num_epochs
+
+    def parse_state(self, state):
+        """
+        Converts a dictionary of 2D arrays (state) into a 3D tensor.
+
+        Args:
+        - state (dict): Dictionary with k keys, where each value is a 2D array of shape (n, m).
+
+        Returns:
+        - torch.Tensor: A tensor of shape (n, m, k).
+        """
+        state_tensor = np.stack(list(state.values()), axis=-1)
+        state_tensor = torch.tensor(state_tensor, dtype=torch.float32)
+        return state_tensor
 
     def collect_trajectory(self):
         """
@@ -51,7 +68,7 @@ class PPOAgent:
 
         while not done:
             # Convert state to tensor
-            state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+            state_tensor = self.state_encoder.forward(self.parse_state(state))
 
             # Select action
             with torch.no_grad():
