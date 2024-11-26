@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class CNNStateEncoder(nn.Module):
-    def __init__(self, input_channels, feature_dim):
+    def __init__(self, cfg):
         """
         Initializes the CNN State Encoder.
 
@@ -14,7 +14,7 @@ class CNNStateEncoder(nn.Module):
         super(CNNStateEncoder, self).__init__()
         
         # First convolutional layer
-        self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(cfg.state_encode, 32, kernel_size=3, stride=1, padding=1)
         self.bn1 = nn.BatchNorm2d(32)
         
         # Second convolutional layer
@@ -33,7 +33,7 @@ class CNNStateEncoder(nn.Module):
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
         
         # Fully connected layer to map features to the desired dimension
-        self.fc = nn.Linear(256 + 128 + 64 + 32, feature_dim)
+        self.fc = nn.Linear(256 + 128 + 64 + 32, cfg.feature_dim)
 
     def forward(self, x):
         # First level

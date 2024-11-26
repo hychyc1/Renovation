@@ -1,23 +1,12 @@
 import numpy as np
 from utils.calc_mean_transportation import calc_mean_transportation
 class RenovationEnv:
-    def __init__(self, cfg):
+    def __init__(self, cfg, grid_info):
         """
         Initializes the environment.
 
         Args:
         - cfg (object): Configuration object containing:
-            - cfg.n (int): Number of rows in the grid.
-            - cfg.m (int): Number of columns in the grid.
-            - cfg.grid_attributes (dict): Grid attributes with keys:
-                - "pop" (np.ndarray): Population distribution on the grid.
-                - "road" (np.ndarray): Road network importance on the grid.
-                - "price_c" (np.ndarray): Commercial property prices on the grid.
-                - "price_r" (np.ndarray): Rental property prices on the grid.
-                - "POI" (np.ndarray): Points of Interest (POI) values on the grid.
-                - "AREA" (np.ndarray): Available area for renovation on the grid.
-                - "r_b" (np.ndarray): Baseline adjustment factor for the grid.
-                - "rent_area" (np.ndarray): Rentable area distribution on the grid.
             - cfg.plot_ratio (float): Plot ratio for renovation costs.
             - cfg.POI_plot_ratio (float): POI plot ratio for renovation costs.
             - cfg.monetary_compensation_ratio (float): Compensation ratio for renovation costs.
@@ -30,14 +19,21 @@ class RenovationEnv:
             - cfg.occupation_rate (float): Occupation rate for rental properties.
             - cfg.combinations (list of tuples): List of combinations as (r_c, r_r, r_poi).
             - cfg.FAR_values (list of float): List of FAR values.
-            - cfg.monetary_weight (float): Weight applied to monetary rewards.
-            - cfg.transportation_weight (float): Weight applied to transportation rewards.
-            - cfg.POI_weight (float): Weight applied to POI rewards.
+            - cfg.reward_specs.monetary_weight (float): Weight applied to monetary rewards.
+            - cfg.reward_specs.transportation_weight (float): Weight applied to transportation rewards.
+            - cfg.reward_specs.POI_weight (float): Weight applied to POI rewards.
+
+        - grid_info (dict): Grid attributes with keys:
+            - "pop" (np.ndarray): Population distribution on the grid.
+            - "price_c" (np.ndarray): Commercial property prices on the grid.
+            - "price_r" (np.ndarray): Rental property prices on the grid.
+            - "POI" (np.ndarray): Points of Interest (POI) values on the grid.
+            - "AREA" (np.ndarray): Available area for renovation on the grid.
+            - "r_b" (np.ndarray): Baseline adjustment factor for the grid.
         """
-        self.n = cfg.n
-        self.m = cfg.m
-        self.original_state = {key: value.copy() for key, value in cfg.grid_attributes.items()}
-        self.current_state = {key: value.copy() for key, value in cfg.grid_attributes.items()}
+        self.n, self.m = grid_info.values()[0].shape
+        self.original_state = {key: value.copy() for key, value in grid_info.items()}
+        self.current_state = {key: value.copy() for key, value in grid_info.items()}
 
         # Global parameters
         self.plot_ratio = cfg.plot_ratio
@@ -54,9 +50,9 @@ class RenovationEnv:
         self.FAR_values = cfg.FAR_values
 
         # Reward weights
-        self.monetary_weight = cfg.monetary_weight
-        self.transportation_weight = cfg.transportation_weight
-        self.POI_weight = cfg.POI_weight
+        self.monetary_weight = cfg.reward_specs.monetary_weight
+        self.transportation_weight = cfg.reward_specs.transportation_weight
+        self.POI_weight = cfg.reward_specs.POI_weight
 
         # Counter
         self.current_year = 0

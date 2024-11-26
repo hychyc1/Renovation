@@ -1,5 +1,6 @@
 from torch import nn
 import torch
+import torch.nn.functional as F
 
 class PolicyHead(nn.Module):
     def __init__(self, cfg):
@@ -16,8 +17,8 @@ class PolicyHead(nn.Module):
         super().__init__()
         self.feature_dim = cfg.feature_dim
         self.grid_size = cfg.grid_size
-        self.num_comb = cfg.num_comb
-        self.num_far = cfg.num_far
+        self.num_comb = len(cfg.combinations)
+        self.num_far = len(cfg.FAR_values)
 
         self.n, self.m = self.grid_size
 

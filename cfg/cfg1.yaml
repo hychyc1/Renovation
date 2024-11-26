@@ -1,6 +1,6 @@
 # reward
 reward_specs:
-  monetray_weight: 0.5
+  monetary_weight: 0.5
   transportation_weight: 0.5
   POI_weight: 0.5
 
@@ -10,23 +10,48 @@ agent_specs:
 
 gamma: 0.995
 tau: 0.0
-state_encoder_specs:
-  grid_feature: ['renovatable', 'population', 'road', 'sellprice', 'rentprice', 'POI']
-  grid_feature_name: 6
 
-  state_encoder_hidden_size: [16, 4]
-  gcn_node_dim: 16
-  num_gcn_layers: 2
-  num_edge_fc_layers: 1
-  max_num_nodes: 1000
-  max_num_edges: 3000
-  num_attention_heads: 1
+# base info
+plot_ratio: 0.8
+POI_plot_ratio: 0.75
+speed_c: 0
+speed_r: 0
+max_yr: 10
+inflation_rate: 0.015
+POI_affect_range: 5
+space_per_person: 30
+occupation_rate: 0.9
+FAR_values: [1.8, 1.9, 2.0, 2.1, 2.2]
+combinations: [
+  [0.4, 0.4, 0.4],
+  [0.3, 0.5, 0.2],
+  [0.1, 0.6, 0.3],
+  [0.2, 0.6, 0.2],
+  [0.1, 0.7, 0.2],
+  [0.2, 0.7, 0.1],
+  [0.4, 0.3, 0.3],
+  [0.5, 0.2, 0.3],
+  [0.6, 0.2, 0.2],
+  [0.6, 0.1, 0.3],
+  [0.6, 0.3, 0.1],
+  [0.7, 0.2, 0.1],
+  [0.3, 0.3, 0.4],
+  [0.4, 0.2, 0.4],
+  [0.2, 0.4, 0.4]
+]
+
+
+state_encoder_specs:
+  grid_attributes: ['AREA', 'pop', 'road', 'price_c', 'price_r', 'POI', 'r_b']
+  grid_feature_name: 6
+  feature_dim: 
+
 policy_specs:
-  policy_land_use_head_hidden_size: [32, 1]
-  policy_road_head_hidden_size: [32, 1]
+
 value_specs:
   value_head_hidden_size: [32, 32, 1]
-lr: 4.0e-4
+policy_lr: 4.0e-4
+value_lr: 4.0e-4
 weightdecay: 0.0
 eps: 1.0e-5
 
@@ -44,3 +69,5 @@ num_optim_epoch: 4
 #mini_batch_size: 1024
 mini_batch_size: 1024
 save_model_interval: 10
+
+
