@@ -1,20 +1,24 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-from tqdm import tqdm
+from torch.utils.data import DataLoader, TensorDataset
 from models.policy import PolicyHead
 from models.state_encoder import CNNStateEncoder
 from models.value import ValueNetwork
+import numpy as np
+import logging
+from tqdm import tqdm
+from Config.config import Config
 
 class PPOAgent:
-    def __init__(self, cfg, env):
+    def __init__(self, cfg: Config, env, log_file="training.log"):
         """
         PPO Agent for training with the provided environment.
 
         Args:
         - cfg (object): Configuration object containing hyperparameters and network configurations.
         - env: The environment with `reset` and `step` methods.
+        - log_file (str): Path to the log file for training logs.
         """
         self.env = env
         self.cfg = cfg
@@ -35,38 +39,11 @@ class PPOAgent:
         self.value_pred_coef = cfg.value_pred_coef
         self.batch_size = cfg.batch_size
         self.num_epochs = cfg.num_epochs
-        self.num_episodes_per_iteration = cfg.num_episodes_per_iteration  # Number of episodes per iteration
+        self.num_episodes_per_iteration = cfg.num_episodes_per_iteration
 
-    def save_checkpoint(self, file_path):
-        """
-        Saves the model weights to a checkpoint file.
-
-        Args:
-        - file_path (str): Path to save the checkpoint.
-        """
-        torch.save({
-            'policy_net': self.policy_net.state_dict(),
-            'value_net': self.value_net.state_dict(),
-            'state_encoder': self.state_encoder.state_dict(),
-            'policy_optimizer': self.policy_optimizer.state_dict(),
-            'value_optimizer': self.value_optimizer.state_dict()
-        }, file_path)
-        print(f"Checkpoint saved to {file_path}.")
-
-    def load_checkpoint(self, file_path):
-        """
-        Loads model weights from a checkpoint file.
-
-        Args:
-        - file_path (str): Path to the checkpoint file.
-        """
-        checkpoint = torch.load(file_path)
-        self.policy_net.load_state_dict(checkpoint['policy_net'])
-        self.value_net.load_state_dict(checkpoint['value_net'])
-        self.state_encoder.load_state_dict(checkpoint['state_encoder'])
-        self.policy_optimizer.load_state_dict(checkpoint['policy_optimizer'])
-        self.value_optimizer.load_state_dict(checkpoint['value_optimizer'])
-        print(f"Checkpoint loaded from {file_path}.")
+        # Set up logging
+        logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
+        self.logger = logging.getLogger()
 
     def parse_state(self, state):
         """
@@ -76,14 +53,14 @@ class PPOAgent:
         - state (dict): Dictionary with k keys, where each value is a 2D array of shape (n, m).
 
         Returns:
-        - torch.Tensor: A tensor of shape (k, n, m).
+        - torch.Tensor: A tensor of shape (batch_size, k, n, m).
         """
         state_tensor = np.stack(list(state.values()), axis=0)
         return torch.tensor(state_tensor, dtype=torch.float32)
 
     def collect_trajectory(self):
         """
-        Collects a single trajectory by interacting with the environment.
+        Collects a trajectory by interacting with the environment.
 
         Returns:
         - states (list): List of encoded states.
@@ -98,28 +75,29 @@ class PPOAgent:
         done = False
 
         while not done:
-            # Convert state to tensor and encode
+            # Convert state to tensor and ensure it is batched
             state_tensor = self.parse_state(state).unsqueeze(0)  # Add batch dimension
             state_encoded = self.state_encoder(state_tensor).squeeze(0)  # Remove batch dimension after encoding
 
-            # Select action
             with torch.no_grad():
                 selected_actions = self.policy_net.select_action(state_encoded)
                 log_prob, _ = self.policy_net.get_log_prob_entropy(state_encoded, selected_actions)
 
-            # Interact with the environment
-            next_state, reward, done, _ = self.env.step(selected_actions[0])
+            next_state, reward, done, info = self.env.step(selected_actions[0])
+
+            # print(info)
 
             # Record trajectory
-            states.append(state_encoded)  # Do not detach; needed for gradient computation
+            states.append(state_encoded)
             actions.append(selected_actions[0])
             rewards.append(reward)
-            log_probs.append(log_prob)
+            log_probs.append(log_prob[0])
             dones.append(done)
 
             state = next_state
 
         return states, actions, rewards, log_probs, dones
+
 
     def compute_advantages(self, rewards, values, dones):
         """
@@ -149,6 +127,126 @@ class PPOAgent:
 
         return torch.tensor(advantages, dtype=torch.float32), torch.tensor(returns, dtype=torch.float32)
 
+    def shuffle_trajectory(self, states, actions, log_probs, advantages, returns):
+        """
+        Permutes the trajectory to reduce variance during training.
+
+        Args:
+        - states (list): States from the trajectory.
+        - actions (list): Actions from the trajectory.
+        - log_probs (list): Log probabilities of the actions.
+        - advantages (torch.Tensor): Advantages computed from the trajectory.
+        - returns (torch.Tensor): Discounted returns.
+
+        Returns:
+        - Shuffled versions of all inputs.
+        """
+        indices = torch.randperm(len(states))
+        states = [states[i] for i in indices]
+        actions = [actions[i] for i in indices]
+        log_probs = [log_probs[i] for i in indices]
+        advantages = advantages[indices]
+        returns = returns[indices]
+        return states, actions, log_probs, advantages, returns
+
+    def update_policy(self, states, actions, log_probs_old, advantages):
+        """
+        Updates the policy network using PPO's clipped surrogate objective.
+
+        Args:
+        - states (list): Encoded states.
+        - actions (list): Actions taken corresponding to states.
+        - log_probs_old (list): Log probabilities under the old policy.
+        - advantages (torch.Tensor): Computed advantages (one per step, shared across all actions).
+        """
+        for _ in range(self.num_epochs):
+            # print(f'AA {len(states)} {self.batch_size} BB')
+            for idx in tqdm(range(0, len(states), self.batch_size)):
+                # Ensure the batch doesn't exceed dataset length
+                end_idx = min(idx + self.batch_size, len(states))
+
+                # Get mini-batch
+                state_batch = torch.stack(states[idx:end_idx])  # Batch of states
+                action_batch = actions[idx:end_idx]  # Batch of actions
+                log_probs_old_batch = torch.stack(log_probs_old[idx:end_idx])  # Batch of log_probs
+                advantages_batch = advantages[idx:end_idx]  # Batch of advantages
+
+                # Compute new log probabilities and entropy
+                log_probs_new, entropy = self.policy_net.get_log_prob_entropy(state_batch, action_batch)
+
+                # Expand the single advantage per step to match the action dimension
+                advantages_expanded = advantages_batch.unsqueeze(-1).expand_as(log_probs_new)
+
+                # Compute ratios
+                ratios = torch.exp(log_probs_new - log_probs_old_batch)
+
+                # PPO objective
+                surrogate1 = ratios * advantages_expanded
+                surrogate2 = torch.clamp(ratios, 1 - self.eps, 1 + self.eps) * advantages_expanded
+                policy_loss = -torch.min(surrogate1, surrogate2).mean() - self.entropy_coef * entropy.mean()
+
+                # Backpropagation
+                self.policy_optimizer.zero_grad()
+                policy_loss.backward(retain_graph=True) 
+                self.policy_optimizer.step()
+
+    def update_value(self, states, returns):
+        """
+        Updates the value network using mean squared error loss.
+
+        Args:
+        - states (list): Encoded states.
+        - returns (torch.Tensor): Target returns.
+        """
+        for _ in range(self.num_epochs):
+            for idx in range(0, len(states), self.batch_size):
+                # Ensure the batch doesn't exceed dataset length
+                end_idx = min(idx + self.batch_size, len(states))
+
+                # Get mini-batch
+                state_batch = torch.stack(states[idx:end_idx])
+                return_batch = returns[idx:end_idx]
+
+                # Compute value predictions
+                values = self.value_net(state_batch).squeeze(-1)
+                value_loss = self.value_pred_coef * (values - return_batch).pow(2).mean()
+
+                # Backpropagation
+                self.value_optimizer.zero_grad()
+                value_loss.backward(retain_graph=True)  
+                self.value_optimizer.step()
+
+    def save_checkpoint(self, file_path):
+        """
+        Saves the model weights to a checkpoint file.
+
+        Args:
+        - file_path (str): Path to save the checkpoint.
+        """
+        torch.save({
+            'policy_net': self.policy_net.state_dict(),
+            'value_net': self.value_net.state_dict(),
+            'state_encoder': self.state_encoder.state_dict(),
+            'policy_optimizer': self.policy_optimizer.state_dict(),
+            'value_optimizer': self.value_optimizer.state_dict()
+        }, file_path)
+        self.logger.info(f"Checkpoint saved to {file_path}")
+
+    def load_checkpoint(self, file_path):
+        """
+        Loads model weights from a checkpoint file.
+
+        Args:
+        - file_path (str): Path to the checkpoint file.
+        """
+        checkpoint = torch.load(file_path)
+        self.policy_net.load_state_dict(checkpoint['policy_net'])
+        self.value_net.load_state_dict(checkpoint['value_net'])
+        self.state_encoder.load_state_dict(checkpoint['state_encoder'])
+        self.policy_optimizer.load_state_dict(checkpoint['policy_optimizer'])
+        self.value_optimizer.load_state_dict(checkpoint['value_optimizer'])
+        self.logger.info(f"Checkpoint loaded from {file_path}")
+
     def train(self, num_iterations):
         """
         Trains the agent for a given number of iterations.
@@ -156,34 +254,40 @@ class PPOAgent:
         Args:
         - num_iterations (int): Number of training iterations.
         """
-        for iteration in tqdm(range(num_iterations)):
-            all_states, all_actions, all_rewards, all_log_probs, all_dones = [], [], [], [], []
+        for iteration in range(num_iterations):
+            states, actions, rewards, log_probs, dones = [], [], [], [], []
 
-            # Collect multiple trajectories
             for _ in tqdm(range(self.num_episodes_per_iteration)):
-                states, actions, rewards, log_probs, dones = self.collect_trajectory()
-                all_states.extend(states)
-                all_actions.extend(actions)
-                all_rewards.extend(rewards)
-                all_log_probs.extend(log_probs)
-                all_dones.extend(dones)
+                cur_states, cur_actions, cur_rewards, cur_log_probs, cur_dones = self.collect_trajectory()
+                states.extend(cur_states)
+                actions.extend(cur_actions)
+                rewards.extend(cur_rewards)
+                log_probs.extend(cur_log_probs)
+                dones.extend(cur_dones)
 
-            # Compute value estimates and advantages
-            values = [self.value_net(state).item() for state in all_states]
-            advantages, returns = self.compute_advantages(all_rewards, values, all_dones)
+            # Compute values and advantages
+            states_tensor = torch.stack(states)
+            values = self.value_net(states_tensor).squeeze(-1).detach().numpy()
+            advantages, returns = self.compute_advantages(rewards, values, dones)
 
             # Shuffle the trajectory
-            all_states, all_actions, all_log_probs, advantages, returns = self.shuffle_trajectory(
-                all_states, all_actions, all_log_probs, advantages, returns
+            states, actions, log_probs, advantages, returns = self.shuffle_trajectory(
+                states, actions, log_probs, advantages, returns
             )
 
             # Update policy and value networks
-            self.update_policy(all_states, all_actions, all_log_probs, advantages)
-            self.update_value(all_states, returns)
+            self.update_policy(states, actions, log_probs, advantages)
+            self.update_value(states, returns)
 
-            print(f"Iteration {iteration + 1}/{num_iterations} complete.")
-            print(f"rewards {np.average(all_rewards)}")
+            # Log average reward
+            avg_reward = np.mean(rewards)
+            self.logger.info(f"Iteration {iteration + 1}/{num_iterations} - Average Reward: {avg_reward}")
+            tqdm.write(f"Iteration {iteration + 1}/{num_iterations} - Average Reward: {avg_reward}")
 
-            # Clear trajectory data
-            del all_states, all_actions, all_rewards, all_log_probs, all_dones
+            # Save checkpoint every 20 iterations
+            if (iteration + 1) % self.cfg.save_model_interval == 0:
+                checkpoint_path = f"checkpoint_iter_{iteration + 1}.pt"
+                self.save_checkpoint(checkpoint_path)
 
+            # Clear trajectory data to save memory
+            del states, actions, rewards, log_probs, dones

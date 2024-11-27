@@ -34,6 +34,7 @@ class Config:
         self.space_per_person = config_dict.get('space_per_person', 30)
         self.occupation_rate = config_dict.get('occupation_rate', 0.9)
         self.FAR_values = config_dict.get('FAR_values', [])
+        self.POI_per_space = config_dict.get('POI_per_space', 0.0006)
         self.combinations = config_dict.get('combinations', [])
         self.monetary_compensation_ratio = config_dict.get('monetary_compensation_ratio', 0.5)
 
@@ -66,7 +67,7 @@ class Config:
         self.num_episodes_per_iteration = config_dict.get('num_episodes_per_iteration', 1200)
         self.max_sequence_length = config_dict.get('max_sequence_length', 37)
         self.num_epochs = config_dict.get('num_epochs', 4)
-        self.batch_size = config_dict.get('mini_size', 1024)
+        self.batch_size = config_dict.get('batch_size', 1024)
         self.save_model_interval = config_dict.get('save_model_interval', 10)
 
     def __repr__(self):

@@ -46,6 +46,7 @@ class RenovationEnv:
         self.POI_affect_range = cfg.POI_affect_range
         self.inflation_rate = cfg.inflation_rate
         self.space_per_person = cfg.space_per_person
+        self.POI_per_space = cfg.POI_per_space
         self.occupation_rate = cfg.occupation_rate
         self.combinations = cfg.combinations
         self.FAR_values = cfg.FAR_values
@@ -105,16 +106,18 @@ class RenovationEnv:
             # Update grid attributes
             grid["AREA"][i, j] = 0  # No area left to renovate
             grid["pop"][i, j] += sell_space / self.space_per_person + self.occupation_rate * rent_space / self.space_per_person
-            grid["POI"][i, j] += POI_space
+            grid["POI"][i, j] += POI_space * self.POI_per_space
 
             # Monetary reward components
             sell_reward = sell_space * grid["price_c"][i, j]
-            rent_reward = rent_space * grid["price_r"][i, j] * 12  # Annual rent revenue
+            rent_reward = rent_space * grid["price_r"][i, j] * 12 * self.max_yr # Annual rent revenue
             cost = (
                 AREA * self.plot_ratio * self.monetary_compensation_ratio * grid["price_c"][i, j]
                 + POI_space * self.POI_plot_ratio * grid["price_c"][i, j]
             )
             R_M += sell_reward + rent_reward - cost
+            # if sell_reward + rent_reward - cost < -1:
+                # print(f"INFO {AREA}, {FAR}, {r_c}, {r_r}, {r_poi}, {sell_space}, {rent_space}, {POI_space}, {sell_reward}, {rent_reward}, {cost}, {R_M}")
 
             # Adjust adjacent grids' prices
             self.update_adjacent_prices(i, j, grid, old_POI)
@@ -128,6 +131,8 @@ class RenovationEnv:
 
         # Transportation reward
         R_T = calc_transport_time(grid["pop"]) - calc_transport_time(old_population)
+
+        # print(f'Popu_old: {old_population.sum()}, POI_old: {old_POI.sum()}, Popu_new: {grid["pop"].sum()}, POI_new: {grid["POI"].sum()}')
 
         # POI reward
         avg_POI_new = grid["POI"].sum() / grid["pop"].sum()
