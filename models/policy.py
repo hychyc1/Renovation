@@ -77,6 +77,8 @@ class PolicyHead(nn.Module):
         batch_size, n, m = grid_probs.shape
         actions = []
 
+        # print(comb_probs.shape)
+
         for b in range(batch_size):
             prob_flat = grid_probs[b].flatten()  # Flatten grid probabilities: [n * m]
             comb_probs_flat = comb_probs[b].view(n * m, self.num_comb)  # Flatten combination probs: [n * m, num_comb]
@@ -97,7 +99,9 @@ class PolicyHead(nn.Module):
                 batch_actions.append((i, j, combination, strength))
 
             actions.append(batch_actions)
-
+        # print(actions)
+        # print(len(actions))
+        # print(actions)
         return actions
 
     def get_log_prob_entropy(self, x, actions):
@@ -126,6 +130,7 @@ class PolicyHead(nn.Module):
 
         log_probs = []
         entropies = []
+        # print(actions)
 
         for b in range(batch_size):
             prob_flat = grid_probs[b].flatten()  # Flatten grid probabilities: [n * m]
@@ -134,7 +139,6 @@ class PolicyHead(nn.Module):
 
             batch_log_probs = []
             batch_entropy = 0.0
-
             for action in actions[b]:
                 i, j, combination, strength = action  # Extract grid, combination, and strength
 

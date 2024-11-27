@@ -1,6 +1,7 @@
 import numpy as np
 
 def calc_transport_time(population):
+    return 0.0
     """
     Calculates the average transportation time based on the population distribution using simple gravity model.
 

@@ -6,6 +6,7 @@ from models.policy import PolicyHead
 from models.state_encoder import CNNStateEncoder
 from models.value import ValueNetwork
 import numpy as np
+from tqdm import tqdm
 
 class PPOAgent:
     def __init__(self, cfg, env):
@@ -47,8 +48,9 @@ class PPOAgent:
         - torch.Tensor: A tensor of shape (n, m, k).
         """
         state_tensor = np.stack(list(state.values()), axis=0)
+        state_tensor = np.array([state_tensor])
         state_tensor = torch.tensor(state_tensor, dtype=torch.float32)
-        print(state_tensor.shape)
+        # print(state_tensor.shape)
         return state_tensor
 
     def collect_trajectory(self):
@@ -69,26 +71,28 @@ class PPOAgent:
 
         while not done:
             # Convert state to tensor
-            state_tensor = self.state_encoder.forward([self.parse_state(state)])
-            print(state_tensor.shape)
+            state_tensor = self.state_encoder.forward(self.parse_state(state))
+            # print(state_tensor.shape)
             # Select action
             with torch.no_grad():
                 # action_probs = self.policy_net(state_tensor)
                 selected_actions = self.policy_net.select_action(state_tensor)
-                log_prob, _ = self.policy_net.get_log_prob_entropy(state_tensor, [selected_actions])
+                log_prob, _ = self.policy_net.get_log_prob_entropy(state_tensor, selected_actions)
 
             # Interact with the environment
             next_state, reward, done, _ = self.env.step(selected_actions[0])  # Unbatch the action for the env
 
             # Record trajectory
-            states.append(state)
+            states.append(state_tensor)
             actions.append(selected_actions[0])  # Store unbatched action
             rewards.append(reward)
             log_probs.append(log_prob.squeeze(0))  # Unbatch the log prob
             dones.append(done)
 
             state = next_state
-
+            # print("AAA")
+        # print(states)
+        # print("AAAAA")
         return states, actions, rewards, log_probs, dones
 
     def compute_advantages(self, rewards, values, dones):
@@ -109,7 +113,11 @@ class PPOAgent:
         next_value = 0
         advantage = 0
 
+        # print(values)
+        # print(dones)
+
         for reward, value, done in zip(reversed(rewards), reversed(values), reversed(dones)):
+            print(reward)
             next_value = 0 if done else next_value
             delta = reward + self.gamma * next_value - value
             advantage = delta + self.gamma * (1 - done) * advantage
@@ -117,7 +125,12 @@ class PPOAgent:
             advantages.insert(0, advantage)
 
             next_value = value
+            # print(advantage)
+            # print(delta)
 
+        # print('AAAAa')
+        # print(advantages)
+        # print(returns)
         return torch.tensor(advantages, dtype=torch.float32), torch.tensor(returns, dtype=torch.float32)
 
     def shuffle_trajectory(self, states, actions, log_probs, advantages, returns):
@@ -206,14 +219,20 @@ class PPOAgent:
         Args:
         - num_iterations (int): Number of training iterations.
         """
-        for iteration in range(num_iterations):
+        for iteration in tqdm(range(num_iterations)):
             # Collect trajectory
+            print("BEGIN")
             states, actions, rewards, log_probs, dones = self.collect_trajectory()
-
+            # print("STEP1")
             # Compute values and advantages
-            states_tensor = torch.tensor(states, dtype=torch.float32)
-            values = self.value_net(states_tensor).squeeze(-1).detach().numpy()
+            states_tensor = torch.stack(states, dim=0)
+            # A = torch.tensor( [item.cpu().detach().numpy() for item in A] )
+
+            values = self.value_net(states_tensor).squeeze(-1).squeeze(-1).detach().numpy()
+            # print(values)
             advantages, returns = self.compute_advantages(rewards, values, dones)
+            
+            print("STEP2")
 
             # Shuffle the trajectory
             states_tensor, actions, log_probs, advantages, returns = self.shuffle_trajectory(
