@@ -23,6 +23,7 @@ class Config:
         self.tau = config_dict.get('tau', 0.0)
 
         # Base information
+        self.grid_size = config_dict.get('grid_size', [55, 54])
         self.plot_ratio = config_dict.get('plot_ratio', 0.8)
         self.POI_plot_ratio = config_dict.get('POI_plot_ratio', 0.75)
         self.speed_c = config_dict.get('speed_c', 0)
@@ -34,6 +35,7 @@ class Config:
         self.occupation_rate = config_dict.get('occupation_rate', 0.9)
         self.FAR_values = config_dict.get('FAR_values', [])
         self.combinations = config_dict.get('combinations', [])
+        self.monetary_compensation_ratio = config_dict.get('monetary_compensation_ratio', 0.5)
 
         # State encoder specifications
         state_encoder_specs = config_dict.get('state_encoder_specs', {})
@@ -63,8 +65,8 @@ class Config:
         self.max_num_iterations = config_dict.get('max_num_iterations', 100)
         self.num_episodes_per_iteration = config_dict.get('num_episodes_per_iteration', 1200)
         self.max_sequence_length = config_dict.get('max_sequence_length', 37)
-        self.num_optim_epoch = config_dict.get('num_optim_epoch', 4)
-        self.mini_batch_size = config_dict.get('mini_batch_size', 1024)
+        self.num_epochs = config_dict.get('num_epochs', 4)
+        self.batch_size = config_dict.get('mini_size', 1024)
         self.save_model_interval = config_dict.get('save_model_interval', 10)
 
     def __repr__(self):

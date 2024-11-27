@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class ValueNetwork(nn.Module):
-    def __init__(self, feature_dim):
+    def __init__(self, cfg):
         """
         Value Network for estimating the state value function.
 
@@ -12,7 +12,7 @@ class ValueNetwork(nn.Module):
         """
         super().__init__()
         # Fully connected layers for value estimation
-        self.fc1 = nn.Linear(feature_dim, 128)
+        self.fc1 = nn.Linear(cfg.feature_dim, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 1)  # Single output for state value
 

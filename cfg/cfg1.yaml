@@ -12,6 +12,7 @@ gamma: 0.995
 tau: 0.0
 
 # base info
+grid_size: [55, 54]
 plot_ratio: 0.8
 POI_plot_ratio: 0.75
 speed_c: 0
@@ -39,12 +40,12 @@ combinations: [
   [0.4, 0.2, 0.4],
   [0.2, 0.4, 0.4]
 ]
-
+monetary_compensation_ratio: 0.5
 
 state_encoder_specs:
-  grid_attributes: ['AREA', 'pop', 'road', 'price_c', 'price_r', 'POI', 'r_b']
+  grid_attributes: ['AREA', 'pop', 'price_c', 'price_r', 'POI', 'r_b']
   grid_feature_name: 6
-  feature_dim: 
+  feature_dim: 128
 
 policy_specs:
 
@@ -65,9 +66,9 @@ max_num_iterations: 100
 num_episodes_per_iteration: 1200
 #max_sequence_length: 100
 max_sequence_length: 37
-num_optim_epoch: 4
+num_epochs: 4
 #mini_batch_size: 1024
-mini_batch_size: 1024
+batch_size: 1024
 save_model_interval: 10
 
 

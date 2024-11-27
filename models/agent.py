@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from policy import PolicyHead
-from state_encoder import CNNStateEncoder
-from value import ValueNetwork
+from models.policy import PolicyHead
+from models.state_encoder import CNNStateEncoder
+from models.value import ValueNetwork
 import numpy as np
 
 class PPOAgent:
@@ -21,8 +21,8 @@ class PPOAgent:
 
         # Initialize networks
         self.policy_net = PolicyHead(cfg)
-        self.value_net = ValueNetwork(cfg.feature_dim)
-        self.state_encoder = CNNStateEncoder(cfg.num_params, cfg.feature_dim)
+        self.value_net = ValueNetwork(cfg)
+        self.state_encoder = CNNStateEncoder(cfg)
 
         # Optimizers
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=cfg.policy_lr)
@@ -30,9 +30,9 @@ class PPOAgent:
 
         # PPO hyperparameters
         self.gamma = cfg.gamma
-        self.epsilon = cfg.epsilon
+        self.eps = cfg.eps
         self.entropy_coef = cfg.entropy_coef
-        self.value_loss_coef = cfg.value_loss_coef
+        self.value_pred_coef = cfg.value_pred_coef
         self.batch_size = cfg.batch_size
         self.num_epochs = cfg.num_epochs
 
@@ -46,8 +46,9 @@ class PPOAgent:
         Returns:
         - torch.Tensor: A tensor of shape (n, m, k).
         """
-        state_tensor = np.stack(list(state.values()), axis=-1)
+        state_tensor = np.stack(list(state.values()), axis=0)
         state_tensor = torch.tensor(state_tensor, dtype=torch.float32)
+        print(state_tensor.shape)
         return state_tensor
 
     def collect_trajectory(self):
@@ -68,11 +69,11 @@ class PPOAgent:
 
         while not done:
             # Convert state to tensor
-            state_tensor = self.state_encoder.forward(self.parse_state(state))
-
+            state_tensor = self.state_encoder.forward([self.parse_state(state)])
+            print(state_tensor.shape)
             # Select action
             with torch.no_grad():
-                action_probs = self.policy_net(state_tensor)
+                # action_probs = self.policy_net(state_tensor)
                 selected_actions = self.policy_net.select_action(state_tensor)
                 log_prob, _ = self.policy_net.get_log_prob_entropy(state_tensor, [selected_actions])
 
@@ -167,7 +168,7 @@ class PPOAgent:
 
                 # Clipped surrogate objective
                 surrogate1 = ratios * advantages_batch
-                surrogate2 = torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon) * advantages_batch
+                surrogate2 = torch.clamp(ratios, 1 - self.eps, 1 + self.eps) * advantages_batch
                 policy_loss = -torch.min(surrogate1, surrogate2).mean() - self.entropy_coef * entropy.mean()
 
                 # Backpropagate
@@ -191,7 +192,7 @@ class PPOAgent:
 
                 # Compute value loss
                 values = self.value_net(state_batch).squeeze(-1)
-                value_loss = self.value_loss_coef * (values - return_batch).pow(2).mean()
+                value_loss = self.value_pred_coef * (values - return_batch).pow(2).mean()
 
                 # Backpropagate
                 self.value_optimizer.zero_grad()
@@ -224,3 +225,4 @@ class PPOAgent:
             self.update_value(states_tensor, returns)
 
             print(f"Iteration {iteration + 1}/{num_iterations} complete.")
+            print(f"Rewards Collected {np.average(rewards)}")

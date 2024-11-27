@@ -1,5 +1,6 @@
 import numpy as np
-from utils.calc_mean_transportation import calc_mean_transportation
+from utils.calc_mean_transportation import calc_transport_time
+
 class RenovationEnv:
     def __init__(self, cfg, grid_info):
         """
@@ -31,7 +32,7 @@ class RenovationEnv:
             - "AREA" (np.ndarray): Available area for renovation on the grid.
             - "r_b" (np.ndarray): Baseline adjustment factor for the grid.
         """
-        self.n, self.m = grid_info.values()[0].shape
+        self.n, self.m = next(iter(grid_info.values())).shape
         self.original_state = {key: value.copy() for key, value in grid_info.items()}
         self.current_state = {key: value.copy() for key, value in grid_info.items()}
 
@@ -50,9 +51,9 @@ class RenovationEnv:
         self.FAR_values = cfg.FAR_values
 
         # Reward weights
-        self.monetary_weight = cfg.reward_specs.monetary_weight
-        self.transportation_weight = cfg.reward_specs.transportation_weight
-        self.POI_weight = cfg.reward_specs.POI_weight
+        self.monetary_weight = cfg.monetary_weight
+        self.transportation_weight = cfg.transportation_weight
+        self.POI_weight = cfg.POI_weight
 
         # Counter
         self.current_year = 0
@@ -126,7 +127,7 @@ class RenovationEnv:
         grid["price_r"] /= 1 + self.inflation_rate
 
         # Transportation reward
-        R_T = calc_mean_transportation(grid["pop"]) - calc_mean_transportation(old_population)
+        R_T = calc_transport_time(grid["pop"]) - calc_transport_time(old_population)
 
         # POI reward
         avg_POI_new = grid["POI"].sum() / grid["pop"].sum()
