@@ -58,7 +58,7 @@ class PPOAgent:
         state_tensor = np.stack(list(state.values()), axis=0)
         return torch.tensor(state_tensor, dtype=torch.float32)
 
-    def collect_trajectory(self):
+    def collect_trajectory(self, mean_action=False):
         """
         Collects a trajectory by interacting with the environment.
 
@@ -80,7 +80,7 @@ class PPOAgent:
             state_encoded = self.state_encoder(state_tensor).squeeze(0)  # Remove batch dimension after encoding
 
             with torch.no_grad():
-                selected_actions = self.policy_net.select_action(state_encoded)
+                selected_actions = self.policy_net.select_action(state_encoded, mean_action)
                 log_prob, _ = self.policy_net.get_log_prob_entropy(state_encoded, selected_actions)
 
             next_state, reward, done, info = self.env.step(selected_actions[0])
@@ -291,3 +291,43 @@ class PPOAgent:
 
             # Clear trajectory data to save memory
             del states, actions, rewards, log_probs, dones
+
+    def eval(self, num_samples):
+        """
+        Evaluates the agent by running the environment for a specified number of samples.
+
+        Args:
+        - num_samples (int): Number of episodes to run for evaluation.
+
+        Returns:
+        - dict: A dictionary containing evaluation metrics (e.g., average rewards).
+        """
+        total_rewards = []
+        all_plans = []
+
+        for _ in tqdm(range(num_samples), desc="Evaluating"):
+            states, actions, rewards, _, _ = self.collect_trajectory(mean_action=True)
+            total_rewards.append(np.sum(rewards))  # Total reward for this episode
+            all_plans.append(actions)  # Store the plan (sequence of actions)
+
+        avg_reward = np.mean(total_rewards)
+        self.logger.info(f"Evaluation completed: Average Reward = {avg_reward:.2f}")
+        tqdm.write(f"Evaluation completed: Average Reward = {avg_reward:.2f}")
+
+        return total_rewards, avg_reward, all_plans
+
+    def infer(self):
+        """
+        Runs inference for a single episode and outputs the plan.
+
+        Returns:
+        - dict: A dictionary containing the plan (sequence of actions) and the total reward.
+        """
+        rewards, _, plans = self.eval(num_samples=1)
+        plan = plans[0]  # Extract the plan for the single episode
+        total_reward = rewards[0]
+
+        tqdm.write(f"Inference completed: Total Reward = {total_reward:.2f}")
+        self.logger.info(f"Inference completed: Total Reward = {total_reward:.2f}")
+
+        return plan, total_reward

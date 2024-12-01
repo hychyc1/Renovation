@@ -42,11 +42,12 @@ combinations: [
 ]
 POI_per_space: 0.006
 monetary_compensation_ratio: 0.5
+grid_per_year: 30
 
 state_encoder_specs:
   grid_attributes: ['AREA', 'pop', 'price_c', 'price_r', 'POI', 'r_b']
   grid_feature_name: 6
-  feature_dim: 128
+  feature_dim: 512
 
 policy_specs:
 

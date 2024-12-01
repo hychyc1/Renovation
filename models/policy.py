@@ -19,6 +19,7 @@ class PolicyHead(nn.Module):
         self.grid_size = cfg.grid_size
         self.num_comb = len(cfg.combinations)
         self.num_far = len(cfg.FAR_values)
+        self.grid_per_year = cfg.grid_per_year
 
         self.n, self.m = self.grid_size
 
@@ -86,10 +87,10 @@ class PolicyHead(nn.Module):
 
             if mean_action:
                 # Select the top 10 grid probabilities
-                top_indices = torch.topk(prob_flat, k=10).indices
+                top_indices = torch.topk(prob_flat, k=self.grid_per_year).indices
             else:
                 # Sample 10 grids based on the probabilities
-                top_indices = torch.multinomial(prob_flat, num_samples=10, replacement=False)
+                top_indices = torch.multinomial(prob_flat, num_samples=self.grid_per_year, replacement=False)
 
             batch_actions = []
             for idx in top_indices:

@@ -1,5 +1,5 @@
 import numpy as np
-from utils.calc_mean_transportation import calc_transport_time
+from utils.calc_mean_transportation import Transportation
 
 class RenovationEnv:
     def __init__(self, cfg, grid_info):
@@ -33,6 +33,7 @@ class RenovationEnv:
             - "r_b" (np.ndarray): Baseline adjustment factor for the grid.
         """
         self.n, self.m = next(iter(grid_info.values())).shape
+        self.Transportation = Transportation(self.n, self.m)
         self.original_state = {key: value.copy() for key, value in grid_info.items()}
         self.current_state = {key: value.copy() for key, value in grid_info.items()}
 
@@ -130,7 +131,7 @@ class RenovationEnv:
         grid["price_r"] /= 1 + self.inflation_rate
 
         # Transportation reward
-        R_T = calc_transport_time(grid["pop"]) - calc_transport_time(old_population)
+        R_T = self.Transportation.calc_transport_time(grid["pop"]) - self.Transportation.calc_transport_time(old_population)
 
         # print(f'Popu_old: {old_population.sum()}, POI_old: {old_POI.sum()}, Popu_new: {grid["pop"].sum()}, POI_new: {grid["POI"].sum()}')
 

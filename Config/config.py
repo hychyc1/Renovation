@@ -37,6 +37,7 @@ class Config:
         self.POI_per_space = config_dict.get('POI_per_space', 0.0006)
         self.combinations = config_dict.get('combinations', [])
         self.monetary_compensation_ratio = config_dict.get('monetary_compensation_ratio', 0.5)
+        self.grid_per_year = config_dict.get('grid_per_year', 30)
 
         # State encoder specifications
         state_encoder_specs = config_dict.get('state_encoder_specs', {})
