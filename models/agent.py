@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-from models.policy import PolicyHead
-from models.state_encoder import CNNStateEncoder
-from models.value import ValueNetwork
 import numpy as np
 import logging
 from tqdm import tqdm
+from models.policy import PolicyHead
+from models.state_encoder import CNNStateEncoder
+from models.value import ValueNetwork
 from Config.config import Config
+
 
 class PPOAgent:
     def __init__(self, cfg: Config, env, log_file="training.log"):
@@ -58,37 +58,47 @@ class PPOAgent:
         state_tensor = np.stack(list(state.values()), axis=0)
         return torch.tensor(state_tensor, dtype=torch.float32)
 
-    def collect_trajectory(self, mean_action=False):
+    def collect_trajectory(self, mean_action=False, info_list=None):
         """
         Collects a trajectory by interacting with the environment.
 
+        Args:
+        - mean_action (bool): If True, selects deterministic actions.
+        - info_list (list): Optional list to store additional environment info.
+
         Returns:
         - states (list): List of encoded states.
+        - masks (list): List of masks for valid grids (AREA > 0).
         - actions (list): List of actions taken as (i, j, combination, strength).
         - rewards (list): List of rewards received.
         - log_probs (list): Log probabilities of actions taken.
         - dones (list): List of done flags.
         """
-        states, actions, rewards, log_probs, dones = [], [], [], [], []
+        states, masks, actions, rewards, log_probs, dones = [], [], [], [], [], []
 
         state = self.env.reset()
         done = False
 
         while not done:
+            # Compute mask for valid grids
+            mask = torch.tensor(state['AREA'] > 0, dtype=torch.bool)  # Mask as a boolean tensor
+
             # Convert state to tensor and ensure it is batched
             state_tensor = self.parse_state(state).unsqueeze(0)  # Add batch dimension
             state_encoded = self.state_encoder(state_tensor).squeeze(0)  # Remove batch dimension after encoding
 
             with torch.no_grad():
-                selected_actions = self.policy_net.select_action(state_encoded, mean_action)
-                log_prob, _ = self.policy_net.get_log_prob_entropy(state_encoded, selected_actions)
+                selected_actions = self.policy_net.select_action(state_encoded, mask, mean_action)
+                log_prob, _ = self.policy_net.get_log_prob_entropy(state_encoded, selected_actions, mask)
 
             next_state, reward, done, info = self.env.step(selected_actions[0])
 
-            # print(info)
+            if info_list is not None:
+                info_list.append(info)
 
             # Record trajectory
             states.append(state_encoded)
+            masks.append(mask)  # Store mask for valid grids
             actions.append(selected_actions[0])
             rewards.append(reward)
             log_probs.append(log_prob[0])
@@ -96,9 +106,8 @@ class PPOAgent:
 
             state = next_state
 
-        return states, actions, rewards, log_probs, dones
-
-
+        return states, masks, actions, rewards, log_probs, dones
+    
     def compute_advantages(self, rewards, values, dones):
         """
         Computes advantages using Generalized Advantage Estimation (GAE).
@@ -127,7 +136,7 @@ class PPOAgent:
 
         return torch.tensor(advantages, dtype=torch.float32), torch.tensor(returns, dtype=torch.float32)
 
-    def shuffle_trajectory(self, states, actions, log_probs, advantages, returns):
+    def shuffle_trajectory(self, states, masks, actions, log_probs, advantages, returns):
         """
         Permutes the trajectory to reduce variance during training.
 
@@ -143,13 +152,14 @@ class PPOAgent:
         """
         indices = torch.randperm(len(states))
         states = [states[i] for i in indices]
+        masks = [masks[i] for i in indices]
         actions = [actions[i] for i in indices]
         log_probs = [log_probs[i] for i in indices]
         advantages = advantages[indices]
         returns = returns[indices]
-        return states, actions, log_probs, advantages, returns
+        return states, masks, actions, log_probs, advantages, returns
 
-    def update_policy(self, states, actions, log_probs_old, advantages):
+    def update_policy(self, states, masks, actions, log_probs_old, advantages):
         """
         Updates the policy network using PPO's clipped surrogate objective.
 
@@ -172,7 +182,7 @@ class PPOAgent:
                 advantages_batch = advantages[idx:end_idx]  # Batch of advantages
 
                 # Compute new log probabilities and entropy
-                log_probs_new, entropy = self.policy_net.get_log_prob_entropy(state_batch, action_batch)
+                log_probs_new, entropy = self.policy_net.get_log_prob_entropy(state_batch, action_batch, masks)
 
                 # Expand the single advantage per step to match the action dimension
                 advantages_expanded = advantages_batch.unsqueeze(-1).expand_as(log_probs_new)
@@ -246,7 +256,7 @@ class PPOAgent:
         self.policy_optimizer.load_state_dict(checkpoint['policy_optimizer'])
         self.value_optimizer.load_state_dict(checkpoint['value_optimizer'])
         self.logger.info(f"Checkpoint loaded from {file_path}")
-
+        
     def train(self, num_iterations):
         """
         Trains the agent for a given number of iterations.
@@ -255,11 +265,12 @@ class PPOAgent:
         - num_iterations (int): Number of training iterations.
         """
         for iteration in range(num_iterations):
-            states, actions, rewards, log_probs, dones = [], [], [], [], []
+            states, masks, actions, rewards, log_probs, dones = [], [], [], [], [], []
 
             for _ in tqdm(range(self.num_episodes_per_iteration)):
-                cur_states, cur_actions, cur_rewards, cur_log_probs, cur_dones = self.collect_trajectory()
+                cur_states, cur_masks, cur_actions, cur_rewards, cur_log_probs, cur_dones = self.collect_trajectory()
                 states.extend(cur_states)
+                masks.extend(cur_masks)
                 actions.extend(cur_actions)
                 rewards.extend(cur_rewards)
                 log_probs.extend(cur_log_probs)
@@ -271,12 +282,12 @@ class PPOAgent:
             advantages, returns = self.compute_advantages(rewards, values, dones)
 
             # Shuffle the trajectory
-            states, actions, log_probs, advantages, returns = self.shuffle_trajectory(
-                states, actions, log_probs, advantages, returns
+            states, masks, actions, log_probs, advantages, returns = self.shuffle_trajectory(
+                states, masks, actions, log_probs, advantages, returns
             )
 
             # Update policy and value networks
-            self.update_policy(states, actions, log_probs, advantages)
+            self.update_policy(states, masks, actions, log_probs, advantages)
             self.update_value(states, returns)
 
             # Log average reward
@@ -286,13 +297,13 @@ class PPOAgent:
 
             # Save checkpoint every 20 iterations
             if (iteration + 1) % self.cfg.save_model_interval == 0:
-                checkpoint_path = f"checkpoint_iter_{iteration + 1}.pt"
+                checkpoint_path = f"checkpoint_iter_{iteration + 1}_reward_{avg_reward: .2f}.pt"
                 self.save_checkpoint(checkpoint_path)
 
             # Clear trajectory data to save memory
-            del states, actions, rewards, log_probs, dones
+            del states, masks, actions, rewards, log_probs, dones
 
-    def eval(self, num_samples):
+    def eval(self, num_samples, info_list=None):
         """
         Evaluates the agent by running the environment for a specified number of samples.
 
@@ -306,7 +317,7 @@ class PPOAgent:
         all_plans = []
 
         for _ in tqdm(range(num_samples), desc="Evaluating"):
-            states, actions, rewards, _, _ = self.collect_trajectory(mean_action=True)
+            states, masks, actions, rewards, _, _ = self.collect_trajectory(mean_action=True, info_list=info_list)
             total_rewards.append(np.sum(rewards))  # Total reward for this episode
             all_plans.append(actions)  # Store the plan (sequence of actions)
 
@@ -323,11 +334,12 @@ class PPOAgent:
         Returns:
         - dict: A dictionary containing the plan (sequence of actions) and the total reward.
         """
-        rewards, _, plans = self.eval(num_samples=1)
+        infos = []
+        rewards, _, plans = self.eval(num_samples=1, info_list=infos)
         plan = plans[0]  # Extract the plan for the single episode
         total_reward = rewards[0]
 
         tqdm.write(f"Inference completed: Total Reward = {total_reward:.2f}")
         self.logger.info(f"Inference completed: Total Reward = {total_reward:.2f}")
 
-        return plan, total_reward
+        return plan, total_reward, infos

@@ -37,6 +37,9 @@ class Transportation:
         numerator = torch.sum(population)  # Total population
         denominator = torch.matmul(population / self.distance_matrix, population)  # Weighted sum
 
+        # print(numerator)
+        # print(denominator)
+
         # Avoid division by zero
         denominator[denominator == 0] = float('inf')
 

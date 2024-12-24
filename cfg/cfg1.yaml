@@ -1,7 +1,7 @@
 # reward
 reward_specs:
   monetary_weight: 0.0000001
-  transportation_weight: 0.5
+  transportation_weight: 20000
   POI_weight: 20000000
 
 # agent
@@ -17,7 +17,7 @@ plot_ratio: 0.8
 POI_plot_ratio: 0.75
 speed_c: 0
 speed_r: 0
-max_yr: 10
+max_yr: 12
 inflation_rate: 0.015
 POI_affect_range: 3
 space_per_person: 30
@@ -47,7 +47,7 @@ grid_per_year: 30
 state_encoder_specs:
   grid_attributes: ['AREA', 'pop', 'price_c', 'price_r', 'POI', 'r_b']
   grid_feature_name: 6
-  feature_dim: 512
+  feature_dim: 1024
 
 policy_specs:
 
@@ -57,6 +57,8 @@ policy_lr: 4.0e-4
 value_lr: 4.0e-4
 weightdecay: 0.0
 eps: 1.0e-5
+balance_alpha: 5.0e-8
+# balance_alpha: 0
 
 value_pred_coef: 0.5
 entropy_coef: 0.01
@@ -71,7 +73,7 @@ num_episodes_per_iteration: 500
 max_sequence_length: 37
 num_epochs: 2
 #mini_batch_size: 1024
-batch_size: 128
+batch_size: 512
 save_model_interval: 20
 
 

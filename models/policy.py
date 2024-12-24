@@ -55,17 +55,18 @@ class PolicyHead(nn.Module):
 
         return torch.cat([grid_probs, comb_probs, far_probs], dim=-1)
 
-    def select_action(self, x, mean_action=False):
+    def select_action(self, x, mask, mean_action=False):
         """
         Selects actions for grid, combination, and strength selection.
 
         Args:
         - x (torch.Tensor): Output from the state encoder, shape [batch_size, feature_dim].
-        - mean_action (bool): If True, select top 10 grids with highest probabilities.
-                              If False, sample grids, combinations, and strengths based on probabilities.
+        - mask (torch.Tensor): Valid grid mask (AREA > 0), shape [n, m].
+        - mean_action (bool): If True, select top `grid_per_year` grids with highest probabilities.
+                            If False, sample `grid_per_year` grids based on probabilities.
 
         Returns:
-        - actions (list of list of tuples): For each batch, a list of 10 tuples (i, j, combination, strength).
+        - actions (list of list of tuples): For each batch, a list of `grid_per_year` tuples (i, j, combination, strength).
         """
         # Forward pass through the policy head
         policy_output = self.forward(x)  # Shape: [batch_size, n, m, 1 + num_comb + num_far]
@@ -78,34 +79,41 @@ class PolicyHead(nn.Module):
         batch_size, n, m = grid_probs.shape
         actions = []
 
-        # print(comb_probs.shape)
-
         for b in range(batch_size):
-            prob_flat = grid_probs[b].flatten()  # Flatten grid probabilities: [n * m]
+            # Apply mask to grid probabilities
+            invalid_value = -2 ** 32  # Large negative value for invalid grids
+            masked_grid_probs = torch.where(mask, grid_probs[b], torch.full_like(grid_probs[b], invalid_value))
+
+            # Flatten masked grid probabilities
+            prob_flat = masked_grid_probs.flatten()  # Flatten grid probabilities: [n * m]
             comb_probs_flat = comb_probs[b].view(n * m, self.num_comb)  # Flatten combination probs: [n * m, num_comb]
             far_probs_flat = far_probs[b].view(n * m, self.num_far)  # Flatten strength probs: [n * m, num_far]
 
+            # print(F.softmax(prob_flat, dim=0))
             if mean_action:
-                # Select the top 10 grid probabilities
+                # Select the top `grid_per_year` grid probabilities
                 top_indices = torch.topk(prob_flat, k=self.grid_per_year).indices
             else:
-                # Sample 10 grids based on the probabilities
-                top_indices = torch.multinomial(prob_flat, num_samples=self.grid_per_year, replacement=False)
+                # Sample `grid_per_year` grids based on probabilities
+                top_indices = torch.multinomial(F.softmax(prob_flat, dim=0), num_samples=self.grid_per_year, replacement=False)
 
             batch_actions = []
             for idx in top_indices:
                 i, j = divmod(idx.item(), m)  # Convert flat index to grid indices
-                combination = torch.multinomial(comb_probs_flat[idx], num_samples=1).item()  # Sample combination
-                strength = torch.multinomial(far_probs_flat[idx], num_samples=1).item()  # Sample strength
+                if mean_action:
+                    combination = torch.topk(comb_probs_flat[idx], k=1).indices
+                    strength = torch.topk(far_probs_flat[idx], k=1).indices 
+                else:
+                    combination = torch.multinomial(comb_probs_flat[idx], num_samples=1).item()  # Sample combination
+                    strength = torch.multinomial(far_probs_flat[idx], num_samples=1).item()  # Sample strength
                 batch_actions.append((i, j, combination, strength))
 
             actions.append(batch_actions)
-        # print(actions)
-        # print(len(actions))
-        # print(actions)
+
         return actions
 
-    def get_log_prob_entropy(self, x, actions):
+
+    def get_log_prob_entropy(self, x, actions, masks):
         """
         Computes the log probabilities and entropy for a batch of grid, combination, and strength actions.
 
@@ -113,6 +121,7 @@ class PolicyHead(nn.Module):
         - x (torch.Tensor): Output from the state encoder, shape [batch_size, feature_dim].
         - actions (list of list of tuples): Actions selected for each batch. 
                                             Each action is (i, j, combination, strength).
+        - mask (torch.Tensor): Valid grid mask (AREA > 0), shape [batch_size, n, m].
 
         Returns:
         - log_probs (torch.Tensor): Log probabilities of the actions, shape [batch_size, num_actions].
@@ -131,10 +140,17 @@ class PolicyHead(nn.Module):
 
         log_probs = []
         entropies = []
-        # print(actions)
+
+        grid_probs_padding = torch.full_like(grid_probs[0], -2 ** 32) # Large negative value for invalid grids
 
         for b in range(batch_size):
-            prob_flat = grid_probs[b].flatten()  # Flatten grid probabilities: [n * m]
+            # Apply mask to grid probabilities
+            invalid_value = -2 ** 32  
+            # masked_grid_probs = torch.where(masks[b], grid_probs[b], grid_probs_padding)
+            # using masks here results in many nan. Figure out why.
+            masked_grid_probs = grid_probs[b]
+
+            prob_flat = masked_grid_probs.flatten()  # Flatten grid probabilities: [n * m]
             comb_probs_flat = comb_probs[b].view(n * m, self.num_comb)  # Flatten combination probs: [n * m, num_comb]
             far_probs_flat = far_probs[b].view(n * m, self.num_far)  # Flatten strength probs: [n * m, num_far]
 

@@ -58,6 +58,8 @@ class Config:
         self.weight_decay = config_dict.get('weightdecay', 0.0)
         self.eps = config_dict.get('eps', 1.0e-5)
 
+        self.balance_alpha = config_dict.get('balance_alpha', 100)
+
         # PPO coefficients
         self.value_pred_coef = config_dict.get('value_pred_coef', 0.5)
         self.entropy_coef = config_dict.get('entropy_coef', 0.01)

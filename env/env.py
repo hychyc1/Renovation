@@ -1,8 +1,9 @@
 import numpy as np
 from utils.calc_mean_transportation import Transportation
+from Config.config import Config
 
 class RenovationEnv:
-    def __init__(self, cfg, grid_info):
+    def __init__(self, cfg: Config, grid_info):
         """
         Initializes the environment.
 
@@ -51,6 +52,11 @@ class RenovationEnv:
         self.occupation_rate = cfg.occupation_rate
         self.combinations = cfg.combinations
         self.FAR_values = cfg.FAR_values
+        self.balance_alpha = cfg.balance_alpha
+        
+        areas = np.sort(self.current_state['AREA'].flatten())[::-1]
+        max_area = areas[:cfg.grid_per_year * cfg.max_yr].sum()
+        self.recommended_per_year = max_area / cfg.max_yr
 
         # Reward weights
         self.monetary_weight = cfg.monetary_weight
@@ -90,6 +96,9 @@ class RenovationEnv:
         old_population = grid["pop"].copy()
         old_POI = grid["POI"].copy()
 
+        # Track renovated area
+        area_this_step = 0
+
         # Calculate rewards
         R_M = 0  # Monetary reward
         for i, j, comb, f in actions:
@@ -98,6 +107,8 @@ class RenovationEnv:
             FAR = self.FAR_values[f]
             AREA = grid["AREA"][i, j]
             r_b = grid["r_b"][i, j]
+
+            area_this_step += AREA
 
             # Sell and rent areas
             sell_space = AREA * FAR * r_c * r_b
@@ -121,7 +132,9 @@ class RenovationEnv:
                 # print(f"INFO {AREA}, {FAR}, {r_c}, {r_r}, {r_poi}, {sell_space}, {rent_space}, {POI_space}, {sell_reward}, {rent_reward}, {cost}, {R_M}")
 
             # Adjust adjacent grids' prices
+
             self.update_adjacent_prices(i, j, grid, old_POI)
+            # print(f"INFO {i}, {j}, {AREA}, {FAR}, {r_c}, {r_r}, {r_poi}, {sell_space}, {rent_space}, {POI_space}, {sell_reward}, {rent_reward}, {cost}, {R_M}")
 
         # Global changes
         self.current_year += 1
@@ -131,22 +144,24 @@ class RenovationEnv:
         grid["price_r"] /= 1 + self.inflation_rate
 
         # Transportation reward
-        R_T = self.Transportation.calc_transport_time(grid["pop"]) - self.Transportation.calc_transport_time(old_population)
-
-        # print(f'Popu_old: {old_population.sum()}, POI_old: {old_POI.sum()}, Popu_new: {grid["pop"].sum()}, POI_new: {grid["POI"].sum()}')
+        R_T = self.Transportation.calc_transport_time(old_population) - self.Transportation.calc_transport_time(grid["pop"])
 
         # POI reward
         avg_POI_new = grid["POI"].sum() / grid["pop"].sum()
         avg_POI_old = old_POI.sum() / old_population.sum()
         R_P = avg_POI_new - avg_POI_old
 
+        # print(f'Popu_old: {old_population.sum()}, POI_old: {old_POI.sum()}, Popu_new: {grid["pop"].sum()}, POI_new: {grid["POI"].sum()}, R_P: {R_P}')
         # Apply reward weights
         weighted_R_M = self.monetary_weight * R_M
         weighted_R_T = self.transportation_weight * R_T
         weighted_R_P = self.POI_weight * R_P
 
+        diff = max(area_this_step - self.recommended_per_year, 0)
+        cost_balance = self.balance_alpha * (diff ** 2)
+
         # Total reward
-        total_reward = weighted_R_M + weighted_R_T + weighted_R_P
+        total_reward = weighted_R_M + weighted_R_T + weighted_R_P - cost_balance
 
         # Check if the episode is done
         done = self.current_year >= self.max_yr
@@ -159,6 +174,7 @@ class RenovationEnv:
             "weighted_R_M": weighted_R_M,
             "weighted_R_T": weighted_R_T,
             "weighted_R_P": weighted_R_P,
+            "cost_balance": cost_balance
         }
 
     def update_adjacent_prices(self, i, j, grid, old_POI):
