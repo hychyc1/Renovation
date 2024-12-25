@@ -182,7 +182,7 @@ class RenovationEnv:
             "weighted_R_T": weighted_R_T,
             "weighted_R_P": weighted_R_P,
             "cost_balance": cost_balance,
-            "POI_change": (grid["POI"] - old_POI) / old_POI,
+            "POI_change": grid["POI"] - old_POI,
             "Transportation_change": R_T_2d / old_transportation
         }
 
