@@ -74,6 +74,48 @@ def generate_plan_gdf(plan, gdf):
 
     return gpd.GeoDataFrame(result_gdf, geometry='geometry')
 
+def process_trajectory_info(info_list, grid_gdf):
+    """
+    1) Reads 'POI_change' and 'Transportation_change' from each dictionary in info_list.
+    2) Appends the values to 'grid_gdf' based on its (row, col) columns.
+    3) Removes 'POI_change' and 'Transportation_change' from the dictionaries in info_list.
+    
+    Args:
+        info_list (list of dict): Each element is a dictionary of info from a trajectory step/episode.
+                                  Some dictionaries contain "POI_change" and "Transportation_change",
+                                  which are (n x m) matrices.
+        grid_gdf (GeoDataFrame): Must have columns "row" and "col" that indicate
+                                 the grid cell index (i, j) for that row in the geodataframe.
+    
+    Returns:
+        None. (Modifies grid_gdf in-place and cleans up info_list.)
+    """
+
+    # Iterate over each row in the GeoDataFrame
+    for idx, row in grid_gdf.iterrows():
+        i = row['row']  # row index in the matrix
+        j = row['column']  # column index in the matrix
+        
+        # We'll build up lists of changes for this cell across all dictionaries
+        poi_list = []
+        trans_list = []
+
+        for info_dict in info_list:
+            # If 'POI_change' or 'Transportation_change' exist, read them
+            poi_list.append(info_dict['POI_change'][i, j].item())
+
+            trans_list.append(info_dict['Transportation_change'][i, j].item())
+
+        # Assign the collected lists back to the GeoDataFrame
+        grid_gdf.at[idx, 'poi_changes'] = " ".join(f"{x:.3f}" for x in poi_list)
+        grid_gdf.at[idx, 'trans_changes'] = " ".join(f"{x:.3f}" for x in trans_list)
+
+    for info_dict in info_list:
+        if 'POI_change' in info_dict:
+            del info_dict['POI_change']
+        if 'Transportation_change' in info_dict:
+            del info_dict['Transportation_change']
+
 if __name__ == '__main__':
     # flags.mark_flags_as_required([
     #   'cfg'
@@ -100,11 +142,14 @@ if __name__ == '__main__':
     # agent = PPOAgent(cfg=cfg, dtype=dtype, device=device)
     agent = PPOAgent(cfg=cfg, env=env)
     
-    weight_path = 'checkpoint_iter_100_reward_ 2383.68.pt'
+    weight_path = 'checkpoint_iter_2_reward_52454.65.pt'
     agent.load_checkpoint(weight_path)
     plan, reward, info = agent.infer()
 
-    # print(info)
+    grid_gdf = gpd.read_file('data/raw_data_with_geometry.shp')
+
+    process_trajectory_info(info, grid_gdf)
+
     info = pd.DataFrame(info)
     save_path = 'inferred_plan/'
     result = plan_to_df(plan, cfg)
@@ -116,6 +161,7 @@ if __name__ == '__main__':
         print(result)
         print(info)
     else:
-        result.to_csv(save_path + 'plan.csv')
-        plan_gdf.to_csv(save_path + 'plan.shp', index=False)
+        result.to_csv(save_path + 'plan.csv', index=False)
+        plan_gdf.to_file(save_path + 'plan.shp')
         info.to_csv(save_path + 'report.csv', index_label='year')
+        grid_gdf.to_file(save_path + 'grid_changes.shp')

@@ -56,7 +56,7 @@ class RenovationEnv:
         
         areas = np.sort(self.current_state['AREA'].flatten())[::-1]
         max_area = areas[:cfg.grid_per_year * cfg.max_yr].sum()
-        self.recommended_per_year = max_area / cfg.max_yr
+        self.recommended_per_year = max_area / cfg.max_yr * cfg.balance_upper
 
         # Reward weights
         self.monetary_weight = cfg.monetary_weight
@@ -144,7 +144,9 @@ class RenovationEnv:
         grid["price_r"] /= 1 + self.inflation_rate
 
         # Transportation reward
-        R_T = self.Transportation.calc_transport_time(old_population) - self.Transportation.calc_transport_time(grid["pop"])
+        old_transportation = self.Transportation.calc_transport_time(old_population)
+        R_T_2d = old_transportation - self.Transportation.calc_transport_time(grid["pop"])
+        R_T = R_T_2d.sum().item()
 
         # POI reward
         avg_POI_new = grid["POI"].sum() / grid["pop"].sum()
@@ -167,14 +169,21 @@ class RenovationEnv:
         done = self.current_year >= self.max_yr
 
         # Return next state, reward, done, and info
+
+        old_transportation[old_transportation == 0] = float('inf')
+        old_POI[old_POI < 1.0e-7] = float('inf')
+
         return grid, total_reward, done, {
+            "AREA": area_this_step,
             "R_M": R_M,
             "R_T": R_T,
             "R_P": R_P,
             "weighted_R_M": weighted_R_M,
             "weighted_R_T": weighted_R_T,
             "weighted_R_P": weighted_R_P,
-            "cost_balance": cost_balance
+            "cost_balance": cost_balance,
+            "POI_change": (grid["POI"] - old_POI) / old_POI,
+            "Transportation_change": R_T_2d / old_transportation
         }
 
     def update_adjacent_prices(self, i, j, grid, old_POI):

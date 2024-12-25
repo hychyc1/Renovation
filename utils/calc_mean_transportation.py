@@ -20,6 +20,9 @@ class Transportation:
         self.distance_matrix = torch.tensor(distance_matrix_np, dtype=torch.float32)
         self.distance_matrix.fill_diagonal_(float('inf'))
 
+        self.distance_matrix_2 = self.distance_matrix.pow(2)
+
+
     def calc_transport_time(self, population):
         """
         Calculates the sum of transportation times across all grids.
@@ -30,21 +33,26 @@ class Transportation:
         Returns:
         - float: Sum of transportation times across all grids.
         """
-        # Flatten the population grid to match the distance matrix
-        population = torch.tensor(population.flatten(), dtype=torch.float32)  # Shape: (n*m,)
 
-        # Compute weighted distances
-        numerator = torch.sum(population)  # Total population
-        denominator = torch.matmul(population / self.distance_matrix, population)  # Weighted sum
+        population = population.flatten()  # shape: [N]
+        population = torch.tensor(population)
+        population = population.unsqueeze(0)
 
-        # print(numerator)
-        # print(denominator)
+        # 3) Broadcast population to shape [1, N], dist is [N, N]
+        # => broadcasted result is [N, N]
+        # numerator(i) = sum_j ( pop[j] / dist(i,j) )
+        numerator = (population / self.distance_matrix).sum(dim=1)  # shape [N]
 
-        # Avoid division by zero
+        # denominator(i) = sum_j ( pop[j] / dist(i,j)^2 )
+        denominator = (population / self.distance_matrix_2).sum(dim=1)  # shape [N]
+
+        # 4) If denominator is exactly 0, set it to infinity
+        # ratio(i) => 0 if denominator is 0
         denominator[denominator == 0] = float('inf')
 
-        # Transportation time for all grids
-        transport_time = numerator / denominator
+        ratio = numerator / denominator  # shape [N]
 
-        # Return the sum of transportation times
-        return torch.sum(transport_time).item()
+        # 5) Reshape back to (n, m)
+        ratio_2d = ratio.view(self.n, self.m)
+        
+        return ratio_2d

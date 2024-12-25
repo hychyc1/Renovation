@@ -59,6 +59,7 @@ class Config:
         self.eps = config_dict.get('eps', 1.0e-5)
 
         self.balance_alpha = config_dict.get('balance_alpha', 100)
+        self.balance_upper = config_dict.get('balance_upper', 1.3)
 
         # PPO coefficients
         self.value_pred_coef = config_dict.get('value_pred_coef', 0.5)

@@ -297,7 +297,7 @@ class PPOAgent:
 
             # Save checkpoint every 20 iterations
             if (iteration + 1) % self.cfg.save_model_interval == 0:
-                checkpoint_path = f"checkpoint_iter_{iteration + 1}_reward_{avg_reward: .2f}.pt"
+                checkpoint_path = f"checkpoint_iter_{iteration + 1}_reward_{avg_reward:.2f}.pt"
                 self.save_checkpoint(checkpoint_path)
 
             # Clear trajectory data to save memory

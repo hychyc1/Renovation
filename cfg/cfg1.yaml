@@ -1,8 +1,8 @@
 # reward
 reward_specs:
   monetary_weight: 0.0000001
-  transportation_weight: 20000
-  POI_weight: 20000000
+  transportation_weight: 200
+  POI_weight: 100000000
 
 # agent
 agent_specs:
@@ -74,6 +74,6 @@ max_sequence_length: 37
 num_epochs: 2
 #mini_batch_size: 1024
 batch_size: 512
-save_model_interval: 20
+save_model_interval: 1
 
 

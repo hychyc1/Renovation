@@ -94,10 +94,15 @@ if __name__ == '__main__':
 
     env = RenovationEnv(cfg=cfg, grid_info=grid_info)
 
+    # checkpoint_path = None
+    checkpoint_path = 'checkpoint_iter_60_reward_ 9133.70.pt'
+
     """create agent"""
     # agent = PPOAgent(cfg=cfg, dtype=dtype, device=device)
     agent = PPOAgent(cfg=cfg, env=env)
-    
+    if checkpoint_path is not None:
+        agent.load_checkpoint(checkpoint_path)
+
     agent.train(cfg.max_num_iterations)
 
     # for iteration in range(cfg.max_num_iterations):
