@@ -144,9 +144,11 @@ class RenovationEnv:
         grid["price_r"] /= 1 + self.inflation_rate
 
         # Transportation reward
-        old_transportation = self.Transportation.calc_transport_time(old_population)
-        R_T_2d = old_transportation - self.Transportation.calc_transport_time(grid["pop"])
-        R_T = R_T_2d.sum().item()
+        old_transportation, old_avg = self.Transportation.calc_transport_time(old_population)
+        new_transportation, new_avg = self.Transportation.calc_transport_time(grid["pop"])
+        R_T_2d = old_transportation - new_transportation
+        R_T = old_avg - new_avg
+        R_T = R_T.item()
 
         # POI reward
         avg_POI_new = grid["POI"].sum() / grid["pop"].sum()

@@ -50,9 +50,11 @@ class Transportation:
         # ratio(i) => 0 if denominator is 0
         denominator[denominator == 0] = float('inf')
 
-        ratio = numerator / denominator  # shape [N]
+        dis = numerator / denominator  # shape [N]
+
+        avg = (dis * population).sum() / population.sum()
 
         # 5) Reshape back to (n, m)
-        ratio_2d = ratio.view(self.n, self.m)
+        dis_2d = dis.view(self.n, self.m)
         
-        return ratio_2d
+        return dis_2d, avg

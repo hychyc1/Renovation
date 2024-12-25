@@ -95,7 +95,7 @@ if __name__ == '__main__':
     env = RenovationEnv(cfg=cfg, grid_info=grid_info)
 
     # checkpoint_path = None
-    checkpoint_path = 'checkpoint_iter_60_reward_ 9133.70.pt'
+    checkpoint_path = 'checkpoint_iter_5_reward_52564.22.pt'
 
     """create agent"""
     # agent = PPOAgent(cfg=cfg, dtype=dtype, device=device)
