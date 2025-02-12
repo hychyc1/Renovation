@@ -3,67 +3,156 @@ import torch.nn as nn
 import torch.nn.functional as F
 from Config.config import Config
 
-class CNNStateEncoder(nn.Module):
-    def __init__(self, cfg: Config):
-        """
-        Initializes the CNN State Encoder.
+class FeaturePyramidEncoder(nn.Module):
+    """
+    A feature-pyramid-like encoder that:
+      1) Takes an input grid of shape [B, in_channels, H, W].
+      2) Builds a fused 2D feature map [B, hidden_dim, H, W] via multi-scale CNN + FPN logic.
+      3) For each village (row, col, area), gathers the cell-level feature and
+         concatenates the 'area' scalar, producing per-village embeddings of shape [B, K, out_dim].
+      4) Also generates a single global feature per batch element [B, global_out_dim],
+         obtained by pooling the fused feature map, and optionally passing it through a small FC.
+      5) The final value network (not shown) can use the global features as input.
+    """
 
+    def __init__(
+        self,
+        cfg: Config
+    ):
+        """
         Args:
-        - cfg (Config): Configuration object.
+            in_channels: Number of channels in the input grid (e.g. base features + area-sum channel).
+            hidden_dim: Number of feature channels in the intermediate/fused feature map.
+            out_dim: Embedding dimension for per-village features.
+            global_out_dim: Dimension of the global feature output (after optional FC).
+            use_global_fc: If True, apply a small FC to the pooled global feature before returning it.
         """
-        super(CNNStateEncoder, self).__init__()
+        super().__init__()
 
-        # First convolutional layer
-        self.conv1 = nn.Conv2d(len(cfg.grid_attributes), 16, kernel_size=3, stride=1, padding=1)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)  # Downsample: 55x54 -> 27x27x16
+        self.hidden_dim = cfg.encoder_hidden_dim
+        self.global_feature_dim = cfg.global_feature_dim
+        self.village_feature_dim = cfg.village_feature_dim
+        # -----------------------------
+        # 1) CNN backbone
+        # -----------------------------
+        self.conv_block1 = nn.Sequential(
+            nn.Conv2d(cfg.in_channels, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),  # Downsample factor of 2
+        )
+        self.conv_block2 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),  # Downsample factor of 2
+        )
+        self.conv_block3 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),  # Downsample factor of 2
+        )
 
-        # Second convolutional layer
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)  # Downsample: 27x27 -> 13x13x32
+        # -----------------------------
+        # 2) FPN lateral projections
+        # -----------------------------
+        self.lateral_conv1 = nn.Conv2d(32, self.hidden_dim, kernel_size=1)
+        self.lateral_conv2 = nn.Conv2d(64, self.hidden_dim, kernel_size=1)
+        self.lateral_conv3 = nn.Conv2d(128, self.hidden_dim, kernel_size=1)
 
-        # Third convolutional layer
-        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.bn3 = nn.BatchNorm2d(64)
-        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)  # Downsample: 13x13 -> 6x6x64
+        # -----------------------------
+        # 3) Per-village MLP
+        #    We add +1 dimension for the 'area' scalar
+        # -----------------------------
+        self.village_mlp = nn.Sequential(
+            nn.Linear(self.hidden_dim + 1, 64),
+            nn.ReLU(),
+            nn.Linear(64, self.village_feature_dim)
+        )
 
-        # Fully connected layer for final encoding
-        # Concatenate features from all levels
-        flattened_size = (27 * 27 * 16) + (13 * 13 * 32) + (6 * 6 * 64)
-        self.fc = nn.Linear(flattened_size, cfg.feature_dim)
+        # -----------------------------
+        # 4) Optional global FC
+        # -----------------------------
+        self.global_fc = nn.Sequential(
+            nn.Linear(self.hidden_dim, self.global_feature_dim),
+            nn.ReLU()
+        )
 
-    def forward(self, x):
+        # Store for clarity
+
+    def forward(self, grid_input: torch.Tensor, village_data: torch.Tensor):
         """
-        Forward pass through the CNN state encoder.
-
         Args:
-        - x (torch.Tensor): Input tensor with shape (batch_size, channels, height, width).
+            grid_input: A batch of grid observations [B, in_channels, H, W].
+            village_data: A batch of village info [B, K, 3], where each entry = (row, col, area).
 
         Returns:
-        - torch.Tensor: Encoded state with shape (batch_size, feature_dim).
+            village_features: Per-village embeddings, shape [B, K, out_dim].
+            global_features:  Global feature vector, shape [B, global_out_dim].
         """
-        # First level
-        x1 = F.leaky_relu(self.bn1(self.conv1(x)))  # Batch: (batch_size, 16, 55, 54)
-        x1_pooled = self.pool1(x1)  # Batch: (batch_size, 16, 27, 27)
+        batch_size, _, height, width = grid_input.shape
 
-        # Second level
-        x2 = F.leaky_relu(self.bn2(self.conv2(x1_pooled)))  # Batch: (batch_size, 32, 27, 27)
-        x2_pooled = self.pool2(x2)  # Batch: (batch_size, 32, 13, 13)
+        # -----------------------------
+        # 1) Multi-scale CNN extraction
+        # -----------------------------
+        features_level1 = self.conv_block1(grid_input)  # [B, 32,  H//2,  W//2 ]
+        features_level2 = self.conv_block2(features_level1)  # [B, 64,  H//4,  W//4 ]
+        features_level3 = self.conv_block3(features_level2)  # [B, 128, H//8,  W//8 ]
 
-        # Third level
-        x3 = F.leaky_relu(self.bn3(self.conv3(x2_pooled)))  # Batch: (batch_size, 64, 13, 13)
-        x3_pooled = self.pool3(x3)  # Batch: (batch_size, 64, 6, 6)
+        # -----------------------------
+        # 2) FPN-style fusion
+        # -----------------------------
+        lateral_map3 = self.lateral_conv3(features_level3)  # [B, hidden_dim, H//8, W//8]
+        lateral_map2 = self.lateral_conv2(features_level2)  # [B, hidden_dim, H//4, W//4]
+        lateral_map1 = self.lateral_conv1(features_level1)  # [B, hidden_dim, H//2, W//2]
 
-        # Flatten all pooled features, preserving batch dimension
-        x1_flat = x1_pooled.view(x.size(0), -1)  # Flatten: (batch_size, 27*27*16)
-        x2_flat = x2_pooled.view(x.size(0), -1)  # Flatten: (batch_size, 13*13*32)
-        x3_flat = x3_pooled.view(x.size(0), -1)  # Flatten: (batch_size, 6*6*64)
+        # Upsample from level3 to level2
+        upsampled_map3 = F.interpolate(lateral_map3, size=lateral_map2.shape[-2:], mode="nearest")
+        fused_map2 = lateral_map2 + upsampled_map3
 
-        # Concatenate features along the last dimension
-        concatenated_features = torch.cat([x1_flat, x2_flat, x3_flat], dim=1)  # (batch_size, flattened_size)
+        # Upsample from level2 to level1
+        upsampled_map2 = F.interpolate(fused_map2, size=lateral_map1.shape[-2:], mode="nearest")
+        fused_map1 = lateral_map1 + upsampled_map2
 
-        # Fully connected layer for final encoding
-        encoded_state = self.fc(concatenated_features)  # (batch_size, feature_dim)
+        # Finally, upsample fused_map1 to the original resolution (H, W)
+        fused_feature_map = F.interpolate(fused_map1, size=(height, width), mode="nearest")
+        # fused_feature_map => [B, hidden_dim, H, W]
 
-        return encoded_state
+        # -----------------------------
+        # 3) Global feature extraction (pooling)
+        # -----------------------------
+        # Global average pooling => [B, hidden_dim, 1, 1]
+        global_pooled = F.adaptive_avg_pool2d(fused_feature_map, (1, 1))
+        # Flatten => [B, hidden_dim]
+        global_feature = global_pooled.view(batch_size, -1)
+
+        # If desired, pass through an optional FC
+        if self.use_global_fc:
+            global_feature = self.global_fc(global_feature)  # [B, global_out_dim]
+
+        # -----------------------------
+        # 4) Per-village feature extraction
+        # -----------------------------
+        # village_data => [B, K, 3], columns => (row, col, area)
+        village_coords = village_data[..., :2].long()      # [B, K, 2]
+        village_areas  = village_data[..., 2].unsqueeze(-1)  # [B, K, 1]
+
+        # Create batch indices [B, K]
+        batch_indices = torch.arange(batch_size, device=grid_input.device).unsqueeze(-1)
+        batch_indices = batch_indices.expand(-1, village_coords.size(1))  # [B, K]
+
+        # Gather the cell feature from fused_feature_map
+        # fused_feature_map => [B, hidden_dim, H, W]
+        # => per_village_features => [B, K, hidden_dim]
+        per_village_features = fused_feature_map[
+            batch_indices,  # [B, K]
+            :,
+            village_coords[..., 0],  # row
+            village_coords[..., 1]   # col
+        ]
+
+        # Concatenate area => [B, K, hidden_dim+1]
+        per_village_features_plus_area = torch.cat([per_village_features, village_areas], dim=-1)
+
+        # Pass through village MLP => [B, K, out_dim]
+        village_features = self.village_mlp(per_village_features_plus_area)
+
+        return village_features, global_feature

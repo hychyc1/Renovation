@@ -1,8 +1,8 @@
 # reward
 reward_specs:
-  monetary_weight: 0.0000001
+  monetary_weight: 0
   transportation_weight: 50000
-  POI_weight: 100000000
+  POI_weight: 0
 
 # agent
 agent_specs:

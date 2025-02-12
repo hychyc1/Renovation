@@ -37,16 +37,20 @@ class Config:
         self.POI_per_space = config_dict.get('POI_per_space', 0.0006)
         self.combinations = config_dict.get('combinations', [])
         self.monetary_compensation_ratio = config_dict.get('monetary_compensation_ratio', 0.5)
-        self.grid_per_year = config_dict.get('grid_per_year', 30)
+        self.village_per_step = config_dict.get('village_per_step', 30)
 
         # State encoder specifications
         state_encoder_specs = config_dict.get('state_encoder_specs', {})
         self.grid_attributes = state_encoder_specs.get('grid_attributes', [])
         self.grid_feature_name = state_encoder_specs.get('grid_feature_name', None)
         self.feature_dim = state_encoder_specs.get('feature_dim', None)
+        self.encoder_hidden_dim = state_encoder_specs.get('encoder_hidden_dim', 128)
+        self.village_feature_dim = state_encoder_specs.get('village_feature_dim', 128)
+        self.global_feature_dim =  state_encoder_specs.get('global_feature_dim', 512)
 
         # Policy specifications
-        self.policy_specs = config_dict.get('policy_specs', {})
+        policy_specs = config_dict.get('policy_specs', {})
+        self.policy_hidden_dim = policy_specs.get('policy_hidden_dim', 128)
 
         # Value specifications
         value_specs = config_dict.get('value_specs', {})

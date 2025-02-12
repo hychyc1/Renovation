@@ -3,7 +3,7 @@ from utils.calc_mean_transportation import Transportation
 from Config.config import Config
 
 class RenovationEnv:
-    def __init__(self, cfg: Config, grid_info):
+    def __init__(self, cfg: Config, grid_info, village_array):
         """
         Initializes the environment.
 
@@ -32,10 +32,18 @@ class RenovationEnv:
             - "POI" (np.ndarray): Points of Interest (POI) values on the grid.
             - "AREA" (np.ndarray): Available area for renovation on the grid.
             - "r_b" (np.ndarray): Baseline adjustment factor for the grid.
+
+        - village_list (list): Each element is (i, j, area)
         """
         self.n, self.m = next(iter(grid_info.values())).shape
         self.Transportation = Transportation(self.n, self.m)
+        self.original_villages = village_array.copy()
+        self.current_villages = self.original_villages.copy()
+        grid_info['AREA'] = np.zeros_like(grid_info['AREA'])
+        for r, c, area in village_array:
+            grid_info['AERA'][r, c] += area
         self.original_state = {key: value.copy() for key, value in grid_info.items()}
+
         self.current_state = {key: value.copy() for key, value in grid_info.items()}
 
         # Global parameters
@@ -71,29 +79,32 @@ class RenovationEnv:
         Resets the environment to its initial state.
 
         Returns:
-        - state (dict): The initial state of the grid, including all attributes.
+        - state (dict, list): The initial state of the grid, including all attributes.
         """
         self.current_state = {key: value.copy() for key, value in self.original_state.items()}
+        self.current_villages = self.original_villages.copy()
         self.current_year = 0
-        return self.current_state
+        return self.current_state, self.current_villages
 
     def step(self, actions):
         """
         Executes a step in the environment based on the given actions.
 
         Args:
-        - actions (list of tuples): Each tuple represents a renovation action as (i, j, comb, f),
-                                    where i, j are grid indices, comb is a renovation combination index,
+        - actions (list of tuples): Each tuple represents a renovation action as (x, comb, f),
+                                    where x is village index, comb is a renovation combination index,
                                     and f is a FAR value index.
 
         Returns:
-        - next_state (dict): The updated grid attributes after the actions.
+        - next_state (dict, list): The updated grid attributes after the actions.
         - reward (float): The total reward from this step.
         - done (bool): Whether the episode has ended.
         - info (dict): Additional information (e.g., breakdown of rewards).
         """
         grid = self.current_state
         old_population = grid["pop"].copy()
+        old_price_r = grid["price_r"].copy()
+        old_price_c = grid["price_c"].copy()
         old_POI = grid["POI"].copy()
 
         # Track renovated area
@@ -101,14 +112,17 @@ class RenovationEnv:
 
         # Calculate rewards
         R_M = 0  # Monetary reward
-        for i, j, comb, f in actions:
+        for x, comb, f in actions:
             # Renovation parameters
+            i, j = self.current_villages[x][0], self.current_villages[x][1]
+            AREA = self.current_villages[x][2]
             r_c, r_r, r_poi = self.combinations[comb]
             FAR = self.FAR_values[f]
-            AREA = grid["AREA"][i, j]
             r_b = grid["r_b"][i, j]
 
+            prev_POI = grid["POI"].copy()
             area_this_step += AREA
+            self.current_villages[x][2] = 0
 
             # Sell and rent areas
             sell_space = AREA * FAR * r_c * r_b
@@ -116,16 +130,16 @@ class RenovationEnv:
             POI_space = AREA * r_poi * r_b
 
             # Update grid attributes
-            grid["AREA"][i, j] = 0  # No area left to renovate
+            grid["AREA"][i, j] -= AREA  # Reduce renovatable area in this grid
             grid["pop"][i, j] += sell_space / self.space_per_person + self.occupation_rate * rent_space / self.space_per_person
             grid["POI"][i, j] += POI_space * self.POI_per_space
 
             # Monetary reward components
-            sell_reward = sell_space * grid["price_c"][i, j]
-            rent_reward = rent_space * grid["price_r"][i, j] * 12 * self.max_yr # Annual rent revenue
+            sell_reward = sell_space * old_price_c[i, j]
+            rent_reward = rent_space * old_price_r[i, j] * 12 * self.max_yr # Annual rent revenue
             cost = (
-                AREA * self.plot_ratio * self.monetary_compensation_ratio * grid["price_c"][i, j]
-                + POI_space * self.POI_plot_ratio * grid["price_c"][i, j]
+                AREA * self.plot_ratio * self.monetary_compensation_ratio * old_price_c[i, j]
+                + POI_space * self.POI_plot_ratio * old_price_c[i, j]
             )
             R_M += sell_reward + rent_reward - cost
             # if sell_reward + rent_reward - cost < -1:
@@ -133,7 +147,7 @@ class RenovationEnv:
 
             # Adjust adjacent grids' prices
 
-            self.update_adjacent_prices(i, j, grid, old_POI)
+            self.update_adjacent_prices(i, j, grid, prev_POI)
             # print(f"INFO {i}, {j}, {AREA}, {FAR}, {r_c}, {r_r}, {r_poi}, {sell_space}, {rent_space}, {POI_space}, {sell_reward}, {rent_reward}, {cost}, {R_M}")
 
         # Global changes
@@ -175,7 +189,7 @@ class RenovationEnv:
         old_transportation[old_transportation == 0] = float('inf')
         old_POI[old_POI < 1.0e-7] = float('inf')
 
-        return grid, total_reward, done, {
+        return grid, self.current_villages, total_reward, done, {
             "AREA": area_this_step,
             "R_M": R_M,
             "R_T": R_T,

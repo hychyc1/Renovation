@@ -1,14 +1,14 @@
 # reward
 reward_specs:
   monetary_weight: 0.0000001
-  transportation_weight: 50000
+  transportation_weight: 500000
   POI_weight: 100000000
 
 # agent
 agent_specs:
   batch_stage: false
 
-gamma: 1
+gamma: 0.95
 tau: 0.0
 
 # base info
@@ -53,8 +53,8 @@ policy_specs:
 
 value_specs:
   value_head_hidden_size: [32, 32, 1]
-policy_lr: 8.0e-5
-value_lr: 8.0e-5
+policy_lr: 1.0e-4
+value_lr: 1.0e-4
 weightdecay: 0.0
 eps: 1.0e-5
 balance_alpha: 2.0e-8

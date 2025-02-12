@@ -8,6 +8,7 @@ import pandas as pd
 from utils.parse_df import parse_df_to_env_state
 import geopandas as gpd
 import pandas as pd
+import argparse
 
 def plan_to_df(plan, cfg):
     """
@@ -117,11 +118,15 @@ def process_trajectory_info(info_list, grid_gdf):
             del info_dict['Transportation_change']
 
 if __name__ == '__main__':
-    # flags.mark_flags_as_required([
-    #   'cfg'
-    # ])
-    cfg_path = 'cfg/cfg1.yaml'
-    cfg = Config.from_yaml(cfg_path)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        type=str,
+        default='cfg/cfg1.yaml',
+        help="Path to the config file."
+    )
+    args = parser.parse_args()
+    cfg = Config.from_yaml(args.config)
 
     dtype = torch.float32
     torch.set_default_dtype(dtype)
@@ -142,7 +147,7 @@ if __name__ == '__main__':
     # agent = PPOAgent(cfg=cfg, dtype=dtype, device=device)
     agent = PPOAgent(cfg=cfg, env=env)
     
-    weight_path = 'checkpoint_iter_2_reward_52454.65.pt'
+    weight_path = 'checkpoint_iter_60_reward_14259.17.pt'
     agent.load_checkpoint(weight_path)
     plan, reward, info = agent.infer()
 
