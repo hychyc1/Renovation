@@ -3,9 +3,8 @@ import yaml
 from models.agent import PPOAgent
 import torch
 from env.env import RenovationEnv
-from Config.config import Config
 import pandas as pd
-from utils.parse_df import parse_df_to_env_state
+from utils.setup import setup_agent
 import argparse
 
 # def parse_df_to_env_state(df):
@@ -74,51 +73,10 @@ import argparse
 
 
 if __name__ == '__main__':
-    # flags.mark_flags_as_required([
-    #   'cfg'
-    # ])
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        type=str,
-        default='cfg/cfg1.yaml',
-        help="Path to the config file."
-    )
-    parser.add_argument(
-        "--checkpoint",
-        type=str,
-        default=None,
-        help="Path to the checkpoint file."
-    )
-    args = parser.parse_args()
-    cfg = Config.from_yaml(args.config)
-
-    dtype = torch.float32
-    torch.set_default_dtype(dtype)
-    if torch.cuda.is_available():
-        device = torch.device('cuda')
-    else:
-        device = torch.device('cpu')
-
-    # checkpoint = int(FLAGS.iteration) if FLAGS.iteration.isnumeric() else FLAGS.iteration
-
-    data_path = 'data_use/updated_grid_info.csv'
-    grid_info = pd.read_csv(data_path)
-    grid_info = parse_df_to_env_state(grid_info)
-
-    village_df = pd.read_csv('data_use/village_with_col.csv')
-
-    env = RenovationEnv(cfg=cfg, grid_info=grid_info, village_array=village_df.values)
-
-    checkpoint_path = args.checkpoint
-    # checkpoint_path = 'checkpoint_iter_1_reward_13462.75.pt'
-
-    """create agent"""
+    agent, cfg = setup_agent()
+    # print("START RUNNING", flush=True)
+    # """create agent"""
     # agent = PPOAgent(cfg=cfg, dtype=dtype, device=device)
-    agent = PPOAgent(cfg=cfg, env=env)
-    if checkpoint_path is not None:
-        agent.load_checkpoint(checkpoint_path)
-
     agent.train(cfg.max_num_iterations)
 
     # for iteration in range(cfg.max_num_iterations):

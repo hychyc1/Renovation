@@ -23,19 +23,18 @@ class Transportation:
         self.distance_matrix_2 = self.distance_matrix.pow(2)
 
 
-    def calc_transport_time(self, population):
+    def calc_transport_time(self, population: torch.Tensor):
         """
         Calculates the sum of transportation times across all grids.
 
         Args:
-        - population (np.ndarray): Population grid of shape (n, m).
+        - population (Tensor): Population grid of shape (n, m).
 
         Returns:
         - float: Sum of transportation times across all grids.
         """
 
         population = population.flatten()  # shape: [N]
-        population = torch.tensor(population)
         population = population.unsqueeze(0)
 
         # 3) Broadcast population to shape [1, N], dist is [N, N]
