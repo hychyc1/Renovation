@@ -34,11 +34,10 @@ def plan_to_df(plan, cfg, villages):
             
             # Extract FAR value from the FAR index
             FAR = cfg.FAR_values[FAR_index]
-            
             # Append the data to rows
             rows.append({
                 'year': year + 1,  # Use 1-based indexing for years
-                'ID': villages.loc[idx]['ID'],
+                'ID': villages.iloc[idx]['ID'],
                 'r_c': r_c,
                 'r_r': r_r,
                 'r_poi': r_poi,
@@ -46,7 +45,7 @@ def plan_to_df(plan, cfg, villages):
             })
     
     # Convert rows to a DataFrame
-    df = pd.DataFrame(rows, columns=['year', 'idx', 'r_c', 'r_r', 'r_poi', 'FAR'])
+    df = pd.DataFrame(rows, columns=['year', 'ID', 'r_c', 'r_r', 'r_poi', 'FAR'])
     return df
 
 
@@ -65,10 +64,10 @@ def generate_plan_gdf(plan, gdf: gpd.GeoDataFrame):
                         ['geometry', 'year', 'r_r', 'r_c', 'r_poi', 'FAR'].
     """
     # Merge plan and gdf based on the grid coordinates
-    merged = gdf.merge(plan, left_index=True, right_on='idx', how='right')
+    merged = gdf.merge(plan, left_index=True, right_on='ID', how='right')
 
     # Select relevant columns
-    output_columns = ['geometry', 'year', 'r_r', 'r_c', 'r_poi', 'FAR']
+    output_columns = ['geometry', 'year', 'r_r', 'r_c', 'r_poi', 'FAR', 'ID']
     result_gdf = merged[output_columns]
 
     return gpd.GeoDataFrame(result_gdf, geometry='geometry')
@@ -125,19 +124,31 @@ if __name__ == '__main__':
 
     info = pd.DataFrame(info)
     save_path = 'inferred_plan/'
-    if cfg.name is not None:
+    # save_path = None
+    if save_path is not None and cfg.name is not None:
         save_path += cfg.name + '/'
-    
-    urban_villages = gpd.read_file('data_with_id/urban_villages_filtered.shp')
-    result = plan_to_df(plan, cfg, urban_villages)
 
-    plan_gdf = generate_plan_gdf(result, urban_villages)
+    village_path = 'data/urban_villages.shp' if cfg.district is None else 'data/' + cfg.district + '/villages.shp'
+    villages = gpd.read_file(village_path)
+    # villages = gpd.read_file('data/urban_villages.shp')
+    villages = villages.dropna()
+    # print(villages)
+    # print(plan)
+    result = plan_to_df(plan, cfg, villages)
+
+    plan_gdf = generate_plan_gdf(result, villages)
 
     if save_path is None:
         print(plan)
         print(result)
+        print(info)
+        sum_rewards = info['weighted_R_M'].sum() + info['weighted_R_P'].sum() + info['weighted_R_T'].sum()
+        print(sum_rewards)
         # print(plan_gdf)
     else:
+        print(info)
+        sum_rewards = info['weighted_R_M'].sum() + info['weighted_R_P'].sum() + info['weighted_R_T'].sum()
+        print(sum_rewards)
         os.makedirs(save_path, exist_ok=True)
         result.to_csv(save_path + 'plan.csv', index=False)
         plan_gdf.to_file(save_path + 'plan.shp')

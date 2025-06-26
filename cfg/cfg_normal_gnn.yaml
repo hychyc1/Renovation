@@ -1,10 +1,9 @@
 name: 'normal_gnn'
 
-# reward
 reward_specs:
   monetary_weight: 0.0000002
-  transportation_weight: 120000
-  POI_weight: 50000000
+  transportation_weight: 200000
+  POI_weight: 150
 
 # agent
 agent_specs:
@@ -50,13 +49,17 @@ state_encoder_specs:
   state_encoder_type: 'GNN'
   grid_attributes: ['AREA', 'pop', 'price_c', 'price_r', 'POI', 'r_b']
   grid_feature_name: 6
-  feature_dim: 1024
+  feature_dim: 1024  
+  village_feature_dim: 64
 
 policy_specs:
   policy_hidden_dim: [32, 32]
+  hidden_dims_selection: [512, 256]
+  hidden_dims_mode: [256, 256]
+  policy_share_mlp: False
 
 value_specs:
-  value_head_hidden_size: [32, 32]
+  value_head_hidden_size: [128, 64]
 policy_lr: 8.0e-5
 value_lr: 8.0e-5
 weightdecay: 0.0
@@ -69,7 +72,7 @@ entropy_coef: 0.01
 clip_epsilon: 0.2
 
 max_num_iterations: 200
-num_episodes_per_iteration: 512
+num_episodes_per_iteration: 256
 # num_episodes_per_iteration: 12
 # num_episodes_per_iteration: 1200
 #max_sequence_length: 100
@@ -77,4 +80,4 @@ max_sequence_length: 30
 num_epochs: 2
 #mini_batch_size: 1024
 batch_size: 128
-save_model_interval: 20
+save_model_interval: 10

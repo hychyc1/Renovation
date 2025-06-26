@@ -112,6 +112,13 @@ def parse_baseline(gdf):
     # gdf = gdf.drop(columns=['geometry', '改造模'])
     return gdf
 
+def parse_csv(df):
+    df = df.rename(columns={'顺序': 'year', '容积率': 'FAR'})
+    # df[['x', 'y', 'z']] = df['改造方案'].astype(str).apply(lambda s: pd.Series(list(s)))
+    df[['r_c', 'r_r', 'r_poi']] = df['改造方案'].astype(str).apply(lambda s: pd.Series([int(d)/10 for d in s]))
+    df = df.drop(columns=['改造方案'])
+    return df
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -152,16 +159,27 @@ if __name__ == "__main__":
     grid_info = pd.read_csv('data/updated_grid_info.csv')
     grid_info = parse_df_to_env_state(grid_info, villages)
 
+    extra_population = pd.read_csv('data/whole_population.csv')
+    extra_population = extra_population.reindex(columns=['row', 'column', 'population'])
+    extra_population_array = extra_population.to_numpy()
     # print(villages)
-    env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy())
+    # print(extra_population_array)
+    env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array)
 
     # plan = gpd.read_file('baseline/方案四/360方案村庄统一格式.shp')
     # plan = gpd.read_file('baseline/方案五/Export_Output_4.shp')
-    plan = gpd.read_file('baseline/方案六/ghy改格式.shp')
+    # plan = gpd.read_file('baseline/方案六/ghy改格式.shp')
+    # plan = gpd.read_file('baseline/greedy2/greedy2.shp')
+    # plan = gpd.read_file('baseline/greedy/greedy.shp')
+    # plan = pd.read_csv('baseline/规则一.csv')
+    # plan = pd.read_csv('baseline/规则二.csv')
+    plan = pd.read_csv('baseline/规则三.csv')
+
     print(plan)
     # plan = gpd.read_file('baseline/方案三/改造村.shp')
     # print(plan[plan['批次']==4], flush=True)
-    plan = parse_baseline(plan)
+    # plan = parse_baseline(plan)
+    plan = parse_csv(plan)
     # print(plan)
     # plan = gpd.read_csv(plan)
 

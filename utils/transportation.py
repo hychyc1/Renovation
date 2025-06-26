@@ -90,15 +90,22 @@ class Transportation:
         self.population[grid_index] += popu
 
         # Adjust populations of outside grid.
-        if self.N_extra > 0:
-            total_outside_pop = self.population[self.N_grid:].sum()
-            if total_outside_pop < popu:
-                raise ValueError("Not enough population in outside grid for movein operation.")
-            factor = (total_outside_pop - popu) / total_outside_pop
-            self.population[self.N_grid:] *= factor
-        else:
-            # If no outside grid exist, raise an error.
-            raise ValueError("No outside grid available for movein operation.")
+        total_outside_pop = self.population[self.N_grid:].sum()
+        if total_outside_pop < popu:
+            raise ValueError("Not enough population in outside grid for movein operation.")
+        factor = (total_outside_pop - popu) / total_outside_pop
+        self.population[self.N_grid:] *= factor
+        
+    def moveout(self, i, j, popu):
+        grid_index = i * self.m + j
+
+        # Increase population at the grid cell.
+        self.population[grid_index] -= popu
+
+        # Adjust populations of outside grid.
+        total_outside_pop = self.population[self.N_grid:].sum()
+        factor = (total_outside_pop + popu) / total_outside_pop
+        self.population[self.N_grid:] *= factor
 
     def calc_transport_time(self):
         """

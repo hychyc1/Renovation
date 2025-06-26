@@ -62,10 +62,16 @@ def setup_agent():
         type=str,
         default=None
     )
+    parser.add_argument(
+        "--district",
+        type=str,
+        default=None
+    )
     args = parser.parse_args()
     cfg = Config.from_yaml(args.config)
     if args.name is not None:
         cfg.set_name(args.name)
+    print(f"Loaded config: {cfg.name}", flush=True)
 
     dtype = torch.float32
     torch.set_default_dtype(dtype)
@@ -78,8 +84,16 @@ def setup_agent():
     # checkpoint = int(FLAGS.iteration) if FLAGS.iteration.isnumeric() else FLAGS.iteration
 
     # data_path = 
-    villages = gpd.read_file('data/urban_villages.shp')
+    cfg.district = args.district
+    village_path = 'data/urban_villages.shp' if args.district is None else 'data/' + args.district + '/villages.shp'
+    villages = gpd.read_file(village_path)
     villages = villages.dropna()
+    # print(villages.sort_values(by='ID'))
+    cfg.total_villages = len(villages)
+    if args.district is not None:
+        cfg.village_per_year = (cfg.total_villages + 25) // 50
+        if cfg.village_per_step > 1:
+            cfg.village_per_step = (cfg.total_villages + 25) // 50
     # print(villages, flush=True)
     villages['area'] = villages.geometry.area
     villages = villages.drop(columns=['geometry', 'Area'])
@@ -95,6 +109,10 @@ def setup_agent():
     env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array)
 
     checkpoint_path = args.checkpoint
+    # agent = PPOAgent(cfg=cfg, device=device, env=env)
+    # if cfg.use_parallel:
+    #     agent = PPOAgentParallel(cfg=cfg, device=device, env=env)
+    # else:
     agent = PPOAgent(cfg=cfg, device=device, env=env)
     if checkpoint_path is not None:
         agent.load_checkpoint(checkpoint_path)
