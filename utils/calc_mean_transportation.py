@@ -1,48 +1,59 @@
 import numpy as np
+import torch
+class Transportation:
+    def __init__(self, n, m):
+        """
+        Initializes the Transportation class with a precomputed distance matrix.
 
-def calc_transport_time(population):
-    return 0.0
-    """
-    Calculates the average transportation time based on the population distribution using simple gravity model.
+        Args:
+        - cfg: Configuration object containing grid size.
+        """
+        self.n, self.m = n, m
 
-    Args:
-    - population (np.ndarray): 2D array representing the population distribution over the grid.
+        # Create all grid coordinates
+        coords = np.array([(x, y) for x in range(self.n) for y in range(self.m)], dtype=np.float32)
+        
+        # Compute pairwise distances using NumPy
+        distance_matrix_np = np.linalg.norm(coords[:, None, :] - coords[None, :, :], axis=-1)
+        
+        # Convert to PyTorch tensor
+        self.distance_matrix = torch.tensor(distance_matrix_np, dtype=torch.float32)
+        self.distance_matrix.fill_diagonal_(float('inf'))
 
-    Returns:
-    - float: Average transportation time.
-    """
-    n, m = population.shape
-    total_distance = 0
-    total_people = population.sum()  # Total population is simply the sum of the grid
+        self.distance_matrix_2 = self.distance_matrix.pow(2)
 
-    for x1 in range(n):
-        for y1 in range(m):
-            if population[x1, y1] == 0:
-                continue
 
-            # Compute flows from (x1, y1) to all (x2, y2)
-            flows = np.zeros((n, m))
-            for x2 in range(n):
-                for y2 in range(m):
-                    if (x1, y1) != (x2, y2) and population[x2, y2] > 0:
-                        distance = np.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
-                        flows[x2, y2] = population[x1, y1] * population[x2, y2] / distance
+    def calc_transport_time(self, population: torch.Tensor):
+        """
+        Calculates the sum of transportation times across all grids.
 
-            # Normalize flows to calculate ratios
-            flow_sum = flows.sum()
-            if flow_sum == 0:
-                continue
+        Args:
+        - population (Tensor): Population grid of shape (n, m).
 
-            # Calculate distance contribution for each target
-            for x2 in range(n):
-                for y2 in range(m):
-                    if flows[x2, y2] > 0:
-                        ratio = flows[x2, y2] / flow_sum
-                        distance = np.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
-                        total_distance += ratio * population[x1, y1] * distance
+        Returns:
+        - float: Sum of transportation times across all grids.
+        """
 
-    # Calculate average transportation time
-    if total_people == 0:
-        return 0.0
+        population = population.flatten()  # shape: [N]
+        population = population.unsqueeze(0)
 
-    return total_distance / total_people
+        # 3) Broadcast population to shape [1, N], dist is [N, N]
+        # => broadcasted result is [N, N]
+        # numerator(i) = sum_j ( pop[j] / dist(i,j) )
+        numerator = (population / self.distance_matrix).sum(dim=1)  # shape [N]
+
+        # denominator(i) = sum_j ( pop[j] / dist(i,j)^2 )
+        denominator = (population / self.distance_matrix_2).sum(dim=1)  # shape [N]
+
+        # 4) If denominator is exactly 0, set it to infinity
+        # ratio(i) => 0 if denominator is 0
+        denominator[denominator == 0] = float('inf')
+
+        dis = numerator / denominator  # shape [N]
+
+        avg = (dis * population).sum() / population.sum()
+
+        # 5) Reshape back to (n, m)
+        dis_2d = dis.view(self.n, self.m)
+        
+        return dis_2d, avg

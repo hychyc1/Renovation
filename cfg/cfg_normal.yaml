@@ -1,0 +1,79 @@
+name: 'normal'
+
+# reward
+reward_specs:
+  monetary_weight: 0.0000002
+  transportation_weight: 200000
+  POI_weight: 100
+
+# agent
+agent_specs:
+  batch_stage: false
+
+gamma: 1.02
+tau: 0.0
+
+# base info
+grid_size: [55, 54]
+plot_ratio: 0.8
+POI_plot_ratio: 0.75
+speed_c: 0.03
+speed_r: 0.03
+max_step: 12
+inflation_rate: 0.015
+POI_affect_range: 3
+space_per_person: 30
+occupation_rate: 0.9
+FAR_values: [1.8, 1.9, 2.0, 2.1, 2.2]
+combinations: [
+  [0.4, 0.2, 0.4],
+  [0.3, 0.5, 0.2],
+  [0.1, 0.6, 0.3],
+  [0.2, 0.6, 0.2],
+  [0.1, 0.7, 0.2],
+  [0.2, 0.7, 0.1],
+  [0.4, 0.3, 0.3],
+  [0.5, 0.2, 0.3],
+  [0.6, 0.2, 0.2],
+  [0.6, 0.1, 0.3],
+  [0.6, 0.3, 0.1],
+  [0.7, 0.2, 0.1],
+  [0.3, 0.3, 0.4],
+  [0.4, 0.2, 0.4],
+  [0.2, 0.4, 0.4]
+]
+POI_per_space: 0.006
+monetary_compensation_ratio: 0.5
+village_per_step: 30
+
+state_encoder_specs:
+  grid_attributes: ['AREA', 'pop', 'price_c', 'price_r', 'POI', 'r_b']
+  grid_feature_name: 6
+  feature_dim: 1024
+
+policy_specs:
+  policy_hidden_dim: [32, 32]
+
+value_specs:
+  value_head_hidden_size: [32, 32]
+policy_lr: 8.0e-5
+value_lr: 8.0e-5
+weightdecay: 0.0
+eps: 1.0e-5
+balance_alpha: 6.0e-8
+# balance_alpha: 0
+
+value_pred_coef: 0.5
+entropy_coef: 0.01
+clip_epsilon: 0.2
+
+max_num_iterations: 200
+num_episodes_per_iteration: 512
+# num_episodes_per_iteration: 30
+# num_episodes_per_iteration: 1200
+#max_sequence_length: 100
+max_sequence_length: 30
+num_epochs: 2
+#mini_batch_size: 1024
+batch_size: 128
+save_model_interval: 20
