@@ -48,7 +48,7 @@ def setup_agent():
     parser.add_argument(
         "--config",
         type=str,
-        default='/n/home04/yichenhuang/Planning/cfg/cfg_gpu.yaml',
+        default='cfg/cfg_normal_gnn.yaml',
         help="Path to the config file."
     )
     parser.add_argument(
@@ -88,8 +88,11 @@ def setup_agent():
     grid_info = pd.read_csv('data/updated_grid_info.csv')
     grid_info = parse_df_to_env_state(grid_info, villages)
 
+    extra_population = pd.read_csv('data/whole_population.csv')
+    extra_population = extra_population.reindex(columns=['row', 'column', 'population'])
+    extra_population_array = extra_population.to_numpy()
     # print(villages)
-    env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy())
+    env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array)
 
     checkpoint_path = args.checkpoint
     agent = PPOAgent(cfg=cfg, device=device, env=env)

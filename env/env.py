@@ -1,11 +1,11 @@
 import numpy as np
-from utils.calc_mean_transportation import Transportation
+from utils.transportation import Transportation
 from utils.config import Config
 import torch
 import torch.nn.functional as F
 
 class RenovationEnv:
-    def __init__(self, cfg: Config, grid_info, village_array, device):
+    def __init__(self, cfg: Config, grid_info, village_array, extra_population, device):
         """
         Initializes the environment.
 
@@ -39,7 +39,7 @@ class RenovationEnv:
         """
         self.device = device
         self.n, self.m = next(iter(grid_info.values())).shape
-        self.Transportation = Transportation(self.n, self.m)
+        self.Transportation = Transportation(self.n, self.m, grid_info['pop'], extra_population)
         self.original_villages = village_array.copy()
         self.current_villages = self.original_villages.copy()
         self.idx_to_position = {int(idx): int(number) for number, (_, _, _, idx) in enumerate(village_array)}
@@ -88,6 +88,7 @@ class RenovationEnv:
         """
         self.current_state = {key: value.clone() for key, value in self.original_state.items()}
         self.current_villages = self.original_villages.copy()
+        self.Transportation.reset()
         self.current_step = 0
         return self.current_state, self.current_villages, self.current_step
 
@@ -115,6 +116,8 @@ class RenovationEnv:
         R_M = 0  # Monetary reward
         repetitive_penalty = 0
 
+        old_transportation, old_avg = self.Transportation.calc_transport_time()
+
         for x, comb, f in actions:
             # Renovation parameters
             i, j = self.current_villages[x][0].astype(int), self.current_villages[x][1].astype(int)
@@ -136,7 +139,9 @@ class RenovationEnv:
 
             # Update grid attributes
             grid["AREA"][i, j] -= AREA  # Reduce renovatable area in this grid
-            grid["pop"][i, j] += sell_space / self.space_per_person + self.occupation_rate * rent_space / self.space_per_person
+            move_in_people = sell_space / self.space_per_person + self.occupation_rate * rent_space / self.space_per_person
+            grid["pop"][i, j] += move_in_people
+            self.Transportation.movein(i, j, move_in_people)
             grid["POI"][i, j] += POI_space * self.POI_per_space
 
             # Monetary reward components
@@ -169,8 +174,7 @@ class RenovationEnv:
         grid["price_r"] /= 1 + self.inflation_rate
 
         # Transportation reward
-        old_transportation, old_avg = self.Transportation.calc_transport_time(old_population)
-        new_transportation, new_avg = self.Transportation.calc_transport_time(grid["pop"])
+        new_transportation, new_avg = self.Transportation.calc_transport_time()
         R_T = old_avg - new_avg
         R_T_ratio = R_T / old_avg
 
@@ -191,6 +195,7 @@ class RenovationEnv:
 
         # Total reward
         total_reward = weighted_R_M + weighted_R_T + weighted_R_P - cost_balance - repetitive_penalty
+        # print(f"{(weighted_R_M, weighted_R_T, weighted_R_P, cost_balance, repetitive_penalty)}")
 
         # Check if the episode is done
         done = self.current_step >= self.max_step
@@ -232,6 +237,7 @@ class RenovationEnv:
         grid = self.current_state
         old_population = grid["pop"].clone()
         old_POI = grid["POI"].clone()
+        old_transportation, old_avg = self.Transportation.calc_transport_time()
 
         # Track renovated area
         area_this_step = 0
@@ -262,7 +268,9 @@ class RenovationEnv:
 
             # Update grid attributes
             grid["AREA"][i, j] -= AREA  # Reduce renovatable area in this grid
-            grid["pop"][i, j] += sell_space / self.space_per_person + self.occupation_rate * rent_space / self.space_per_person
+            move_in_people = sell_space / self.space_per_person + self.occupation_rate * rent_space / self.space_per_person
+            grid["pop"][i, j] += move_in_people
+            self.Transportation.movein(i, j, move_in_people)
             grid["POI"][i, j] += POI_space * self.POI_per_space
 
             # Monetary reward components
@@ -295,8 +303,7 @@ class RenovationEnv:
         grid["price_r"] /= 1 + self.inflation_rate
 
         # Transportation reward
-        old_transportation, old_avg = self.Transportation.calc_transport_time(old_population)
-        new_transportation, new_avg = self.Transportation.calc_transport_time(grid["pop"])
+        new_transportation, new_avg = self.Transportation.calc_transport_time()
         R_T = old_avg - new_avg
         R_T_ratio = R_T / old_avg
 

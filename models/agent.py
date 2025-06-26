@@ -4,7 +4,8 @@ import torch.optim as optim
 import numpy as np
 import logging
 from models.policy import VillagePolicy
-from models.state_encoder import FeaturePyramidEncoder, FeatureEncoderGNN
+from models.state_encoder_cnn import FeaturePyramidEncoder
+from models.state_encoder_gnn import FeatureEncoderGNN
 from models.value import ValueNetwork
 from utils.config import Config
 from tqdm import tqdm
@@ -276,6 +277,7 @@ class PPOAgent:
                 rewards.extend(cur_rewards)
                 log_probs.extend(cur_log_probs)
                 dones.extend(cur_dones)
+                # print(cur_rewards)
             
             print(f"Finish Collecting Episodes", flush=True)
 

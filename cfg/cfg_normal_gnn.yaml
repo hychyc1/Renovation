@@ -1,9 +1,9 @@
-name: 'normal'
+name: 'normal_gnn'
 
 # reward
 reward_specs:
   monetary_weight: 0.0000002
-  transportation_weight: 50000
+  transportation_weight: 120000
   POI_weight: 50000000
 
 # agent
@@ -69,8 +69,8 @@ entropy_coef: 0.01
 clip_epsilon: 0.2
 
 max_num_iterations: 200
-# num_episodes_per_iteration: 512
-num_episodes_per_iteration: 30
+num_episodes_per_iteration: 512
+# num_episodes_per_iteration: 12
 # num_episodes_per_iteration: 1200
 #max_sequence_length: 100
 max_sequence_length: 30

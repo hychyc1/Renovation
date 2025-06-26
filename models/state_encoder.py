@@ -161,28 +161,6 @@ class FeaturePyramidEncoder(nn.Module):
 
         return village_features, global_features
 
-
-class GraphConv(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.lin_self = nn.Linear(in_channels, out_channels)
-        self.lin_neigh = nn.Linear(in_channels, out_channels)
-        self.relu = nn.ReLU()
-        
-    def forward(self, x, edge_index):
-        # x: [N, in_channels]
-        row, col = edge_index  # row: source, col: target
-        neigh_messages = self.lin_neigh(x)  # [N, out_channels]
-        aggregated = torch.zeros_like(neigh_messages)
-        aggregated.index_add_(0, col, neigh_messages[row])
-        out = self.lin_self(x) + aggregated
-        return self.relu(out)
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from utils.config import Config
-
 class GraphConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
