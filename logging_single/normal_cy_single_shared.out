@@ -9047,3 +9047,14 @@ Iteration 752/2000 - Average Reward: 6.871727116457704
 Training Iteration 752
 Collecting Episode 0
 Collecting Episode 10
+Collecting Episode 20
+Collecting Episode 30
+Collecting Episode 40
+Collecting Episode 50
+Collecting Episode 60
+Finish Collecting Episodes in 89.15 seconds
+avg value loss 590.9746492173937
+Iteration 753/2000 - Average Reward: 6.890024896284255
+{'AREA': np.float64(187806.6180518024), 'weighted_R_M': 3.823375862884657, 'weighted_R_T': 2.0419035305579505, 'weighted_R_P': 2.034542931450738, 'cost_balance': np.float64(1.0097974265081453), 'R_T_ratio': 6.139741825225388e-05, 'R_P_ratio': 9.045187249942059e-05}
+Training Iteration 753
+Collecting Episode 0
