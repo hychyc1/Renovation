@@ -4,6 +4,7 @@ import geopandas as gpd
 import numpy as np
 import yaml
 from models.agent import PPOAgent
+from models.agent_parallel import PPOAgentParallel
 import torch
 from env.env import RenovationEnv
 from utils.config import Config
@@ -43,12 +44,12 @@ def parse_df_to_env_state(df, village_df):
         env_state['AREA'][r, c] += row['area']
     return env_state
 
-def setup_agent():
+def setup_agent(construct_agent = True):
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
         type=str,
-        default='/n/home04/yichenhuang/Planning/cfg/cfg_gpu.yaml',
+        default='cfg/cfg_normal_gnn.yaml',
         help="Path to the config file."
     )
     parser.add_argument(
@@ -62,10 +63,16 @@ def setup_agent():
         type=str,
         default=None
     )
+    parser.add_argument(
+        "--district",
+        type=str,
+        default=None
+    )
     args = parser.parse_args()
     cfg = Config.from_yaml(args.config)
     if args.name is not None:
         cfg.set_name(args.name)
+    print(f"Loaded config: {cfg.name}", flush=True)
 
     dtype = torch.float32
     torch.set_default_dtype(dtype)
@@ -78,8 +85,19 @@ def setup_agent():
     # checkpoint = int(FLAGS.iteration) if FLAGS.iteration.isnumeric() else FLAGS.iteration
 
     # data_path = 
-    villages = gpd.read_file('data/urban_villages.shp')
+    cfg.district = args.district
+    village_path = 'data/urban_villages.shp' if args.district is None else 'data/' + args.district + '/villages.shp'
+    villages = gpd.read_file(village_path)
     villages = villages.dropna()
+    # print(villages.sort_values(by='ID'))
+    cfg.total_villages = len(villages)
+
+    mask = None
+    if args.district is not None:
+        cfg.village_per_year = (cfg.total_villages + 25) // 50
+        if cfg.village_per_step > 1:
+            cfg.village_per_step = (cfg.total_villages + 25) // 50
+        mask = torch.tensor(np.loadtxt('data/'+args.district+'/mask.txt', delimiter=',', dtype=np.uint8))
     # print(villages, flush=True)
     villages['area'] = villages.geometry.area
     villages = villages.drop(columns=['geometry', 'Area'])
@@ -88,12 +106,22 @@ def setup_agent():
     grid_info = pd.read_csv('data/updated_grid_info.csv')
     grid_info = parse_df_to_env_state(grid_info, villages)
 
+    extra_population = pd.read_csv('data/whole_population.csv')
+    extra_population = extra_population.reindex(columns=['row', 'column', 'population'])
+    extra_population_array = extra_population.to_numpy()
     # print(villages)
-    env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy())
+    env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array, mask=mask)
 
-    checkpoint_path = args.checkpoint
-    agent = PPOAgent(cfg=cfg, device=device, env=env)
-    if checkpoint_path is not None:
-        agent.load_checkpoint(checkpoint_path)
 
-    return agent, cfg
+    if construct_agent:
+        checkpoint_path = args.checkpoint
+        # agent = PPOAgent(cfg=cfg, device=device, env=env)
+        if cfg.use_parallel:
+            agent = PPOAgentParallel(cfg=cfg, device=device, env=env)
+        else:
+            agent = PPOAgent(cfg=cfg, device=device, env=env)
+        if checkpoint_path is not None:
+            agent.load_checkpoint(checkpoint_path)
+        return agent, cfg
+    else:
+        return env, cfg, villages, args

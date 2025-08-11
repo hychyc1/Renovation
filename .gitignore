@@ -1,7 +1,11 @@
 checkpoints
-playground
 *.log
 *.pt
 inferred_plan
 Plans
 logging
+logging_baselines
+logging_ours
+logging_stat
+logging_state
+*.sh

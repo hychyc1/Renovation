@@ -1,0 +1,10 @@
+Loaded config: single_shared_attention
+Recommendations (np.float64(2763125.933908061), np.float64(6907814.834770152))
+LOAD shared Policy with Attention
+Prepared to train 2000 iterations
+Training Iteration 0
+Collecting Episode 0
+Collecting Episode 10
+Collecting Episode 20
+Collecting Episode 30
+Finish Collecting Episodes in 227.33 seconds

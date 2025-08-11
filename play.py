@@ -1,21 +1,28 @@
 import numpy as np
 import geopandas as gpd
 
-gdf = gpd.read_file('../baseline/方案一/360村庄方案统一格式.shp')
-gdf=gdf.to_crs(3857)
-# print(gdf.crs)
-print(gdf.geometry.area)
+# gdf = gpd.read_file('data/朝阳区/villages.shp')
+# gdf = gdf.drop(columns= ['geometry'])
+# gdf.to_csv('data/朝阳区/villages.csv')
 
-gdf = gpd.read_file('data_use/geometry/六环内城中村.shp')
-print(gdf)
-gdf=gdf.to_crs(3857)
-# gdf = gpd.read_file('data_use/geometry/urban_villages_filtered.shp')
-print(gdf.loc[244].geometry.area)
-print(gdf.loc[243].geometry.area)
-print(gdf.loc[245].geometry.area)
-print(gdf.loc[242].geometry.area)
-print(gdf.loc[241].geometry.area)
-print(gdf.crs)
+
+gdf = gpd.read_file('data/urban_villages_filtered.shp')
+gdf = gdf.drop(columns= ['geometry'])
+gdf.to_csv('data/urban_villages_filtered.csv')
+# gdf=gdf.to_crs(3857)
+# # print(gdf.crs)
+# print(gdf.geometry.area)
+
+# gdf = gpd.read_file('data_use/geometry/六环内城中村.shp')
+# print(gdf)
+# gdf=gdf.to_crs(3857)
+# # gdf = gpd.read_file('data_use/geometry/urban_villages_filtered.shp')
+# print(gdf.loc[244].geometry.area)
+# print(gdf.loc[243].geometry.area)
+# print(gdf.loc[245].geometry.area)
+# print(gdf.loc[242].geometry.area)
+# print(gdf.loc[241].geometry.area)
+# print(gdf.crs)
 
 # import pandas as pd
 # import re

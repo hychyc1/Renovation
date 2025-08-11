@@ -1,0 +1,19 @@
+Loaded config: normal_gnn_l1_bal_single_shared
+Recommendations (0.0, np.float64(6907814.834770152))
+LOAD shared Policy
+Prepared to train 2000 iterations
+Training Iteration 0
+Collecting Episode 0
+Collecting Episode 10
+Collecting Episode 20
+Collecting Episode 30
+Collecting Episode 40
+Collecting Episode 50
+Collecting Episode 60
+Finish Collecting Episodes in 442.75 seconds
+avg value loss 1488022.2708333333
+Iteration 1/2000 - Average Reward: 0.6656264914096229
+{'AREA': np.float64(814880.6493496272), 'weighted_R_M': 1.6523435362668761, 'weighted_R_T': 1.0139178898599412, 'weighted_R_P': -2.000634935167101, 'cost_balance': 0.0, 'R_T_ratio': 1.3126882150886015e-05, 'R_P_ratio': -2.374666367385641e-05}
+Training Iteration 1
+Collecting Episode 0
+Collecting Episode 10

@@ -4,9 +4,15 @@ import torch.optim as optim
 import numpy as np
 import logging
 from models.policy import VillagePolicy
-from models.state_encoder import FeaturePyramidEncoder, FeatureEncoderGNN
+from models.policy_shared_mlp import VillagePolicyShared
+from models.policy_attention import VillagePolicySharedAttn
+from models.policy_shared_one import VillagePolicySharedAltogether
+from models.state_encoder_cnn import FeaturePyramidEncoder
+from models.state_encoder_gnn import FeatureEncoderGNN
+from models.state_encoder_gnn_attn import FeatureEncoderGNNAttn
 from models.value import ValueNetwork
 from utils.config import Config
+import time
 from tqdm import tqdm
 
 
@@ -27,12 +33,21 @@ class PPOAgent:
         self.name = cfg.name
 
         # Initialize networks
-        self.policy_net = VillagePolicy(cfg).to(self.device)
         self.value_net = ValueNetwork(cfg).to(self.device)
-        if cfg.state_encoder_type == 'CNN':
-            self.state_encoder = FeaturePyramidEncoder(cfg).to(self.device)
-        elif cfg.state_encoder_type == 'GNN':
-            self.state_encoder = FeatureEncoderGNN(cfg).to(self.device)
+
+        if cfg.use_attn:
+            self.policy_net = VillagePolicySharedAttn(cfg).to(self.device)
+            self.state_encoder = FeatureEncoderGNNAttn(cfg).to(self.device)
+        else:
+            if cfg.policy_share_mlp:
+                self.policy_net = VillagePolicySharedAltogether(cfg).to(self.device)
+            else:
+                self.policy_net = VillagePolicy(cfg).to(self.device)
+                
+            if cfg.state_encoder_type == 'CNN':
+                self.state_encoder = FeaturePyramidEncoder(cfg).to(self.device)
+            elif cfg.state_encoder_type == 'GNN':
+                self.state_encoder = FeatureEncoderGNN(cfg).to(self.device)
 
         # Optimizers
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=cfg.policy_lr)
@@ -50,6 +65,7 @@ class PPOAgent:
         # Set up logging
         logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
         self.logger = logging.getLogger()
+        # self.print_state_dict()
 
     def parse_state(self, state):
         """
@@ -64,7 +80,7 @@ class PPOAgent:
             village_tensor: shape (num_villages, 3) on device, drop the last one since it is ID
             year: shape (1) on device
         """
-        grid, villages, year = state
+        grid, villages, year, area = state
         # print(state)
         # print(villages)
         grid_tensor = torch.stack(list(grid.values()), axis=0)
@@ -73,7 +89,8 @@ class PPOAgent:
         village_tensor = village_tensor[:,:3]
         # print(village_tensor.shape)
         year_tensor = torch.tensor(year, device=self.device)
-        return grid_tensor, village_tensor, year_tensor
+        area_tensor = torch.tensor(area, device=self.device)
+        return grid_tensor, village_tensor, year_tensor, area_tensor
 
     def collect_trajectory(self, mean_action=False, info_list=None):
         """
@@ -96,14 +113,15 @@ class PPOAgent:
 
         while not done:
             # Convert state to device
-            grid_tensor, village_tensor, year_tensor = self.parse_state(state)
+            grid_tensor, village_tensor, year_tensor, area_tensor = self.parse_state(state)
 
             # Encode
             with torch.no_grad():
                 v_feats, g_feats = self.state_encoder(
                     grid_tensor.unsqueeze(0),  # add batch dim
                     village_tensor.unsqueeze(0),
-                    year_tensor.unsqueeze(0)
+                    year_tensor.unsqueeze(0),
+                    area_tensor.unsqueeze(0)
                 )
                 # v_feats: [1, N, embed_dim], g_feats: [1, global_dim]
 
@@ -227,6 +245,7 @@ class PPOAgent:
         returns: [T] on device
         """
         T = len(global_features)
+        val_losses = []
         for _ in range(self.num_epochs):
             for start in range(0, T, self.batch_size):
                 end = min(start + self.batch_size, T)
@@ -235,10 +254,18 @@ class PPOAgent:
 
                 values = self.value_net(gf_batch).squeeze(-1)
                 value_loss = self.value_pred_coef * (values - ret_batch).pow(2).mean()
-
+                val_losses.append(value_loss.item())
                 self.value_optimizer.zero_grad()
                 value_loss.backward()
                 self.value_optimizer.step()
+        print(f"avg value loss {np.average(val_losses)}", flush=True)
+
+    def print_state_dict(self):
+        print("Model's state_dict:")
+        for model in [self.policy_net, self.value_net, self.state_encoder]:
+            for param_tensor in model.state_dict():
+                print(param_tensor, "\t", model.state_dict()[param_tensor].size())
+        print("CHECK SIZE", flush=True)
 
     def save_checkpoint(self, file_path):
         file_path = "checkpoints/" + file_path
@@ -267,8 +294,11 @@ class PPOAgent:
             print(f"Training Iteration {iteration}", flush=True)
             states, actions, rewards, log_probs, dones = [], [], [], [], []
             info = []
+            output_gap = 100 if self.num_episodes_per_iteration >= 100 else 10
+            # for episode in tqdm(range(self.num_episodes_per_iteration)):
+            start_time = time.time()
             for episode in range(self.num_episodes_per_iteration):
-                if episode % 100 == 0:
+                if episode % output_gap == 0:
                     print(f"Collecting Episode {episode}", flush=True)
                 cur_states, cur_actions, cur_rewards, cur_log_probs, cur_dones = self.collect_trajectory(info_list=info)
                 states.extend(cur_states)
@@ -276,8 +306,10 @@ class PPOAgent:
                 rewards.extend(cur_rewards)
                 log_probs.extend(cur_log_probs)
                 dones.extend(cur_dones)
+                # print(cur_rewards)
             
-            print(f"Finish Collecting Episodes", flush=True)
+            end_time = time.time()
+            print(f"Finish Collecting Episodes in {end_time-start_time:.2f} seconds", flush=True)
 
             # States is list of (village_feats, global_feats)
             # Convert to Tensors on device

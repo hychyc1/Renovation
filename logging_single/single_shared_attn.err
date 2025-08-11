@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/n/home04/yichenhuang/Planning_now/train.py", line 9, in <module>
+    agent.train(cfg.max_num_iterations)
+  File "/n/home04/yichenhuang/Planning_now/models/agent.py", line 343, in train
+    self.update_policy(vf_shuf, actions_shuf, log_probs_shuf_t, adv_shuf)
+  File "/n/home04/yichenhuang/Planning_now/models/agent.py", line 238, in update_policy
+    policy_loss.backward()
+  File "/n/home04/yichenhuang/.conda/envs/ML/lib/python3.10/site-packages/torch/_tensor.py", line 572, in backward
+    return handle_torch_function(
+  File "/n/home04/yichenhuang/.conda/envs/ML/lib/python3.10/site-packages/torch/overrides.py", line 1717, in handle_torch_function
+    result = mode.__torch_function__(public_api, types, args, kwargs)
+  File "/n/home04/yichenhuang/.conda/envs/ML/lib/python3.10/site-packages/torch/utils/_device.py", line 106, in __torch_function__
+    return func(*args, **kwargs)
+  File "/n/home04/yichenhuang/.conda/envs/ML/lib/python3.10/site-packages/torch/_tensor.py", line 581, in backward
+    torch.autograd.backward(
+  File "/n/home04/yichenhuang/.conda/envs/ML/lib/python3.10/site-packages/torch/autograd/__init__.py", line 347, in backward
+    _engine_run_backward(
+  File "/n/home04/yichenhuang/.conda/envs/ML/lib/python3.10/site-packages/torch/autograd/graph.py", line 825, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.03 GiB. GPU 0 has a total capacity of 79.25 GiB of which 6.01 GiB is free. Including non-PyTorch memory, this process has 73.23 GiB memory in use. Of the allocated memory 63.88 GiB is allocated by PyTorch, and 8.85 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
