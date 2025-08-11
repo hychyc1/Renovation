@@ -2,10 +2,12 @@ import numpy as np
 import pandas as pd
 import numpy as np
 import yaml
+import os
 import geopandas as gpd
 from models.agent import PPOAgent
 import torch
 from env.env import RenovationEnv
+# from env.env_3 import RenovationEnv
 from utils.config import Config
 import pandas as pd
 import argparse
@@ -43,25 +45,25 @@ def parse_df_to_env_state(df, village_df):
         env_state['AREA'][r, c] += row['area']
     return env_state
 
-def save_grid(save_path):
-    grid_gdf = gpd.read_file('data_use/geometry/raw_data_with_geometry.shp')
+def save_grid(save_path, plan):
+    grid_gdf = gpd.read_file('data/grid/raw_data_with_geometry.shp')
     
     original = env.get_state()
 
-    for actions in nested_list:
+    for actions in plan:
         env.renovate(actions)
     finished = env.get_state()
 
     env.reset()
-    for _ in range(cfg.max_step):
-        env.renovate([])
+    for _ in range(cfg.max_year):
+        env.signal_year_end()
     natural = env.get_state()
 
-    finished["price_r"] *= (1 + cfg.inflation_rate) ** cfg.max_step
-    finished["price_c"] *= (1 + cfg.inflation_rate) ** cfg.max_step
+    finished["price_r"] *= (1 + cfg.inflation_rate) ** cfg.max_year
+    finished["price_c"] *= (1 + cfg.inflation_rate) ** cfg.max_year
 
-    natural["price_r"] *= (1 + cfg.inflation_rate) ** cfg.max_step
-    natural["price_c"] *= (1 + cfg.inflation_rate) ** cfg.max_step
+    natural["price_r"] *= (1 + cfg.inflation_rate) ** cfg.max_year
+    natural["price_c"] *= (1 + cfg.inflation_rate) ** cfg.max_year
 
     for idx, row in grid_gdf.iterrows():
         i = row['row']  # row index in the matrix
@@ -88,21 +90,23 @@ def save_grid(save_path):
         os.makedirs(save_path, exist_ok=True)
         grid_gdf.to_file(save_path + 'grid_changes.shp')
 
-
-def save_result(save_path):
+def evaluate(save_path, save_name, nested_list):
     info_list = []
+    env.reset()
+    sum_reward = 0
+    # print(len(nested_list))
     for actions in nested_list:
-        _, _, _, info = env.renovate(actions)
+        # print(len(actions))
+        _, reward, _, info = env.renovate(actions)
         info_list.append(info)
+        sum_reward += reward
     infos = pd.DataFrame(info_list)
-    sum_rewards = infos['weighted_R_M'].sum() + infos['weighted_R_P'].sum() + infos['weighted_R_T'].sum()
-    print(sum_rewards)
-    if save_path is None:
-        print(infos)
-    else:
-        import os
-        os.makedirs(save_path, exist_ok=True)
-        infos.to_csv(save_path + 'report.csv')
+    # infos['weighted_R_M'] *= 5
+    raw_sum_rewards = infos['weighted_R_M'].sum() + infos['weighted_R_P'].sum() + infos['weighted_R_T'].sum()
+    # print(sum_rewards)
+    if save_path is not None:
+        infos.to_csv(save_path + 'report_' + save_name)
+    return (infos['weighted_R_M'].sum(), infos['weighted_R_P'].sum(), infos['weighted_R_T'].sum(), sum_reward)
 
 def parse_baseline(gdf):
     gdf = gdf.rename(columns={'批次': 'year', '容积率': 'FAR'})
@@ -130,16 +134,44 @@ if __name__ == "__main__":
         "--save_result",
         type=bool,
         default=True
+    ) 
+    parser.add_argument(
+        "--plan_name",
+        type=str,
+        default=None
+    )
+    parser.add_argument(
+        "--chaoyang",
+        type=bool,
+        default = False
     )
     args = parser.parse_args()
     # config_path = 'cfg/cfg_' + args.name + ".yaml"
-    config_path = 'cfg/cfg_normal_gnn.yaml'
-    # config_path = 'cfg/cfg_eval.yaml'
-    plan = 'inferred_plan/' + args.name + "/plan.csv"
+    if args.chaoyang:
+        print("Eval Chaoyang")
+        config_path = 'cfg/cfg_eval_cy.yaml'
+        mask = torch.tensor(np.loadtxt('data/'+'朝阳区'+'/mask.txt', delimiter=',', dtype=np.uint8))
+        baseline_path = './baseline_csv/朝阳区'
+        our_path = 'inferred_plan/朝阳区/plan_new.csv'
+        # our_path = 'inferred_plan/朝阳区.csv'
+        save_path = 'Eval_results/Chaoyang/'
+
+    else:
+        config_path  = 'cfg/cfg_eval.yaml'
+        mask = None
+        baseline_path = './baseline_csv'
+        our_path = 'inferred_plan/plan_new.csv'
+        save_path = 'Eval_results/Global/'
+    # plan = 'inferred_plan/' + args.name + "/plan.csv"
     
+    plan_name = args.plan_name
+
     cfg = Config.from_yaml(config_path)
     if args.name is not None:
         cfg.set_name(args.name)
+
+    if args.chaoyang:
+        cfg.village_per_year = 6
 
     dtype = torch.float32
     torch.set_default_dtype(dtype)
@@ -166,35 +198,52 @@ if __name__ == "__main__":
     extra_population_array = extra_population.to_numpy()
     # print(villages)
     # print(extra_population_array)
-    env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array)
+    # mask = torch.tensor(np.loadtxt('data/'+'朝阳区'+'/mask.txt', delimiter=',', dtype=np.uint8))
+    env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array, mask=mask)
 
-    # plan = gpd.read_file('baseline/方案四/360方案村庄统一格式.shp')
-    # plan = gpd.read_file('baseline/方案五/Export_Output_4.shp')
-    # plan = gpd.read_file('baseline/方案六/ghy改格式.shp')
-    # plan = gpd.read_file('baseline/greedy2/greedy2.shp')
-    # plan = gpd.read_file('baseline/greedy/greedy.shp')
-    # plan = pd.read_csv('baseline/规则一.csv')
-    # plan = pd.read_csv('baseline/规则二.csv')
-    # plan = pd.read_csv('baseline/规则三.csv')
-    plan = pd.read_csv('ga/test_2213.3213.csv')
-
-    print(plan)
-    # plan = gpd.read_file('baseline/方案三/改造村.shp')
-    # print(plan[plan['批次']==4], flush=True)
-    # plan = parse_baseline(plan)
-    # plan = parse_csv(plan)
-    # print(plan)
-    # plan = gpd.read_csv(plan)
-
-    grouped = plan.groupby('year')
-    nested_list = [group[['ID', 'r_c', 'r_r', 'r_poi', 'FAR']].apply(tuple, axis=1).tolist() for _, group in grouped]
-    print(nested_list[3])
-
-    save_result(None)
+    # baseline_path = './baseline_csv/朝阳区'
     
-    # save_path = 'inferred_plan/'
-    # if cfg.name is not None:
-    #     save_path += cfg.name + '/'
+    # for filename in os.listdir(baseline_path):
+        # if filename[0] == '.':
+            # continue
 
-    # if args.save_result:
-    #     save_result(save_path)
+    results = []
+    
+    # for filename in ['方案一.csv', '方案二.csv', '方案三.csv', '方案四.csv', '方案五.csv', '方案六.csv', 
+    #                  '规则一改.csv', '规则二.csv', '规则三.csv', 
+    #                  'district.csv', 'district_own.csv', 
+    #                  'greedy.csv', 'greedy2.csv', 'greedy_MC.csv', 'ga_cur.csv']:
+    for filename in ['ga_0810.csv']:
+        file_path = os.path.join(baseline_path, filename)
+        # print(file_path)
+        if not os.path.exists(file_path):
+            continue
+        plan = pd.read_csv(file_path)
+        grouped = plan.groupby('year')
+        # print(grouped)
+        nested_list = [group[['ID', 'r_c', 'r_r', 'r_poi', 'FAR']].apply(tuple, axis=1).tolist() for _, group in grouped]
+
+        r_m, r_p, r_t, _ = evaluate(save_path, filename, nested_list)
+        r = r_m + r_p + r_t
+        results.append((filename[:-4], r_m, r_p, r_t, r))
+        print(f"{filename[:-4]}, {r_m: .2f}, {r_p: .2f}, {r_t: .2f}, {r: .2f}", flush=True)
+
+    # file_path = 'inferred_plan/朝阳区.csv'
+    # if True:
+    # if False:
+    plan = pd.read_csv(our_path)
+    grouped = plan.groupby('year')
+    # print(grouped)
+    nested_list = [group[['ID', 'r_c', 'r_r', 'r_poi', 'FAR']].apply(tuple, axis=1).tolist() for _, group in grouped]
+    # save_grid('Eval_results/Global', nested_list)
+    r_m, r_p, r_t, r = evaluate(save_path, 'ours.csv', nested_list)
+    r = r_m + r_p + r_t
+    print(f"ours, {r_m: .2f}, {r_p: .2f}, {r_t: .2f}, {r: .2f}", flush=True)
+    # print(("ours", f"{r_m: .2f}", f"{r_p: .2f}", f"{r_t: .2f}"), flush=True)
+    results.append(('ours', r_m, r_p, r_t, r))
+
+    results_df = pd.DataFrame(results, columns=['name', 'r_m', 'r_p', 'r_t', 'r'])
+    results_df['r_m (raw)'] = results_df['r_m'] / cfg.monetary_weight
+    results_df['r_p (raw)'] = results_df['r_p'] / cfg.POI_weight
+    results_df['r_t (raw)'] = results_df['r_t'] / cfg.transportation_weight
+    results_df.to_csv(save_path+'summary.csv')
