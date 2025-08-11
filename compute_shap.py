@@ -62,8 +62,7 @@ def compute_shapley_exact(env, districts_and_plans) -> pd.DataFrame:
     for district in district_names:
         print(district, flush=True)
         others = all_districts - {district}
-        for r in range(n):  # 0 到 n-1 个其他元素的子集
-            print(r, flush=True)
+        for r in range(n): 
             for subset in itertools.combinations(others, r):
                 subset_set = set(subset)
 
@@ -186,7 +185,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     # config_path = 'cfg/cfg_' + args.name + ".yaml"
-    config_path = 'cfg/cfg_eval.yaml'
+    config_path = 'cfg/cfg_eval_no_balance.yaml'
     plan = 'inferred_plan/' + args.name + "/plan.csv"
     
     cfg = Config.from_yaml(config_path)
@@ -220,25 +219,26 @@ if __name__ == "__main__":
     # print(extra_population_array)
     env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array)
 
-    name = 'global'
-    plan = pd.read_csv(f'plans/{name}.csv')
+    for name in ['global', 'district_own', 'district_global']:
+        name = 'global'
+        plan = pd.read_csv(f'plans/{name}.csv')
 
-    districts = ['丰台区', '剩余五区', '大兴区', '房山区', '昌平区', '朝阳区', '海淀区', '通州区', '顺义区']
+        districts = ['丰台区', '剩余五区', '大兴区', '房山区', '昌平区', '朝阳区', '海淀区', '通州区', '顺义区']
 
-    districts_and_plans = [(district, restrict(district, plan)) for district in districts]
+        districts_and_plans = [(district, restrict(district, plan)) for district in districts]
 
-  
-    # print("Leave one out")
-    # print(estimate_shapley_leave_one_out(env, districts_and_plans), flush=True) 
+    
+        # print("Leave one out")
+        # print(estimate_shapley_leave_one_out(env, districts_and_plans), flush=True) 
 
-    # print("Own Reward")
-    # dist_reward = {}
-    # for district in districts:
-    #     mask = torch.tensor(np.loadtxt('data/'+district+'/mask.txt', delimiter=',', dtype=np.uint8))
-    #     env_dist = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array, mask=mask)
-    #     _, dist_reward[district] = evaluate(env_dist, plan, manual_signal=False)
-    # print(dist_reward)
+        # print("Own Reward")
+        # dist_reward = {}
+        # for district in districts:
+        #     mask = torch.tensor(np.loadtxt('data/'+district+'/mask.txt', delimiter=',', dtype=np.uint8))
+        #     env_dist = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array, mask=mask)
+        #     _, dist_reward[district] = evaluate(env_dist, plan, manual_signal=False)
+        # print(dist_reward)
 
-    # print("Shap")
-    Shap_results = compute_shapley_exact(env, districts_and_plans)
-    Shap_results.to_csv(f'plans/{name}_shap.csv')
+        # print("Shap")
+        Shap_results = compute_shapley_exact(env, districts_and_plans)
+        Shap_results.to_csv(f'plans/SHAP_{name}.csv')

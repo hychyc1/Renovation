@@ -52,7 +52,7 @@ state_encoder_specs:
   grid_attributes: ['AREA', 'pop', 'price_c', 'price_r', 'POI', 'r_b', 'mask']
   grid_feature_name: 7
   feature_dim: 4096  
-  village_feature_dim: 128
+  village_feature_dim: 256
 
 policy_specs:
   hidden_dims_selection: [256, 256]

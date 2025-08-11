@@ -71,7 +71,7 @@ class GeneticPlanner:
         tournament_k: int = 2,
         crossover_rate: float = 0.7,
         mutation_rate: float = 0.2,
-        elite_frac: float = 0.1,
+        elite_frac: float = 0.05,
         random_seed: int | None = None,
         save_path: str = "ga",
     ) -> None:

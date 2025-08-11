@@ -1,9 +1,9 @@
 name: 'eval_config'
 
 reward_specs:
-  monetary_weight: 1.0e-8
-  transportation_weight: 7000
-  POI_weight: 10
+  monetary_weight: 1.0e-9
+  transportation_weight: 700
+  POI_weight: 1
 
 # agent
 agent_specs:

@@ -2,7 +2,6 @@ checkpoints
 *.log
 *.pt
 inferred_plan
-Plans
 logging
 logging_baselines
 logging_ours
