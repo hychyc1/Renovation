@@ -1,6 +1,5 @@
 checkpoints
 *.log
-*.pt
 inferred_plan
 logging
 logging_baselines
