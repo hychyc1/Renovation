@@ -11,7 +11,7 @@ import geopandas as gpd
 import pandas as pd
 import argparse
 
-def plan_to_df(plan, cfg, villages):
+def plan_to_df(plan, cfg: Config, villages):
     """
     Converts a renovation plan into a DataFrame.
 
@@ -26,8 +26,10 @@ def plan_to_df(plan, cfg, villages):
     - pd.DataFrame: DataFrame with columns ['year', 'row', 'column', 'r_c', 'r_r', 'r_poi', 'FAR'].
     """
     rows = []
-    
-    for year, renovations in enumerate(plan):
+    div = 1
+    if len(plan) != 12:
+        div = cfg.village_per_year
+    for num, renovations in enumerate(plan):
         for (idx, comb, FAR_index) in renovations:
             # Extract r_c, r_r, r_poi from the combination index
             r_c, r_r, r_poi = cfg.combinations[comb]
@@ -36,7 +38,7 @@ def plan_to_df(plan, cfg, villages):
             FAR = cfg.FAR_values[FAR_index]
             # Append the data to rows
             rows.append({
-                'year': year + 1,  # Use 1-based indexing for years
+                'year': (num // div) + 1,  # Use 1-based indexing for years
                 'ID': villages.iloc[idx]['ID'],
                 'r_c': r_c,
                 'r_r': r_r,

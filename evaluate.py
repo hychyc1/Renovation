@@ -152,7 +152,7 @@ if __name__ == "__main__":
         config_path = 'cfg/cfg_eval_cy.yaml'
         mask = torch.tensor(np.loadtxt('data/'+'朝阳区'+'/mask.txt', delimiter=',', dtype=np.uint8))
         baseline_path = './baseline_csv/朝阳区'
-        our_path = 'inferred_plan/朝阳区/plan_new.csv'
+        our_path = 'inferred_plan/朝阳区/plan_attn.csv'
         # our_path = 'inferred_plan/朝阳区.csv'
         save_path = 'Eval_results/Chaoyang/'
 
@@ -213,7 +213,7 @@ if __name__ == "__main__":
     #                  '规则一改.csv', '规则二.csv', '规则三.csv', 
     #                  'district.csv', 'district_own.csv', 
     #                  'greedy.csv', 'greedy2.csv', 'greedy_MC.csv', 'ga_cur.csv']:
-    for filename in ['ga_0810.csv']:
+    for filename in ['greedy.csv']:
         file_path = os.path.join(baseline_path, filename)
         # print(file_path)
         if not os.path.exists(file_path):
