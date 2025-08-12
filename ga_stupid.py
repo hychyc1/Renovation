@@ -69,9 +69,9 @@ class GeneticPlanner:
         population_size: int = 50,
         generations: int = 400,
         tournament_k: int = 2,
-        crossover_rate: float = 0.7,
+        crossover_rate: float = 0.8,
         mutation_rate: float = 0.2,
-        elite_frac: float = 0.05,
+        elite_frac: float = 0.1,
         random_seed: int | None = None,
         save_path: str = "ga",
     ) -> None:
