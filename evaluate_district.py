@@ -112,7 +112,7 @@ if __name__ == "__main__":
 
         plan = pd.read_csv(plan_path)
 
-        districts = ['丰台区', '剩余五区', '大兴区', '房山区', '昌平区', '朝阳区', '海淀区', '通州区', '顺义区']
+        districts = ['Fengtai', 'Remaining', 'Daxing', 'Fangshan', 'Changping', 'Chaoyang', 'Haidian', 'Tongzhou', 'Shunyi']
 
         districts_and_plans = [(district, restrict(district, plan)) for district in districts]
 
