@@ -152,7 +152,8 @@ if __name__ == "__main__":
         config_path = 'cfg/cfg_eval_cy.yaml'
         mask = torch.tensor(np.loadtxt('data/'+'朝阳区'+'/mask.txt', delimiter=',', dtype=np.uint8))
         baseline_path = './baseline_csv/朝阳区'
-        our_path = 'inferred_plan/朝阳区/plan_attn.csv'
+        # our_path = 'inferred_plan/朝阳区/plan_attn.csv'
+        our_path = 'inferred_plan/normal_gnn_cy/plan.csv'
         # our_path = 'inferred_plan/朝阳区.csv'
         save_path = 'Eval_results/Chaoyang/'
 

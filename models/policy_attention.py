@@ -54,6 +54,7 @@ class VillagePolicySharedAttn(nn.Module):
         return nn.Sequential(*layers)
 
     def scale_logits(self, logits: torch.Tensor, limit=20.0, dim=-1):
+        return logits
         max_abs = torch.max(torch.abs(logits), dim=dim, keepdim=True).values
         scale  = torch.clamp(max_abs / limit, min=1.0)
         return logits / scale

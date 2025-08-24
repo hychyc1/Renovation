@@ -152,7 +152,7 @@ class MCGreedyPlanner:
         comb_list: Sequence[Sequence[float | int] | dict],
         max_year: int = 12,
         village_per_year: int = 30,
-        num_sample: int = 10_000,
+        num_sample: int = 5_000,
         seed: int | None = None,
     ) -> None:
         self.env              = env
@@ -338,7 +338,7 @@ if __name__ == "__main__":
         far_list=cfg.FAR_values,
         comb_list=cfg.combinations,
         village_per_year=cfg.village_per_year,
-        seed=42
+        seed=3
     )
 
     best_plan, best_score = gp.run()

@@ -82,6 +82,7 @@ class Config:
         self.balance_alpha = config_dict.get('balance_alpha', 1000)
         self.balance_func = config_dict.get('balance_func', "l_2")
         self.balance_upper = config_dict.get('balance_upper', 1.2)
+        self.balance_lower = config_dict.get('balance_lower', 0.5)
         self.repetitive_penalty = config_dict.get('repetitive_penalty', 1e6)
 
         # PPO coefficients

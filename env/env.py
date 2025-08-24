@@ -3,7 +3,7 @@ from utils.transportation import Transportation
 from utils.config import Config
 import torch
 import torch.nn.functional as F
-from scipy.ndimage import convolve
+# from scipy.ndimage import convolve
 
 class RenovationEnv:
     def __init__(self, cfg: Config, grid_info, village_array, extra_population, device, mask = None):
@@ -71,7 +71,8 @@ class RenovationEnv:
         self.FAR_values = cfg.FAR_values
         self.balance_alpha = cfg.balance_alpha
         self.balance_func = cfg.balance_func
-        self.balance_range = cfg.balance_upper
+        self.balance_lower = cfg.balance_lower
+        self.balance_upper = cfg.balance_upper
         self.mask = mask
         
         self.idx_to_position = {int(idx): int(number) for number, (_, _, _, idx) in enumerate(village_array)}
@@ -79,12 +80,12 @@ class RenovationEnv:
         self.far_to_position = {far: int(number) for number, far in enumerate(self.FAR_values)}
 
         areas = np.sort([village[2] for village in self.current_villages])[::-1]
-        max_area = areas[:cfg.village_per_year * cfg.max_year].sum() / cfg.max_year * self.balance_range
-        min_area = areas[-cfg.village_per_year * cfg.max_year:].sum() / self.balance_range
-        # self.recommended_per_year = max_area / cfg.max_year * cfg.balance_upper
-        avg_area = np.average([village[2] for village in self.current_villages]) * self.village_per_year
+        max_area = areas[:cfg.village_per_year * cfg.max_year].sum() / cfg.max_year
+        # min_area = areas[-cfg.village_per_year * cfg.max_year:].sum() / self.balance_range
+        # # self.recommended_per_year = max_area / cfg.max_year * cfg.balance_upper
+        # avg_area = np.average([village[2] for village in self.current_villages]) * self.village_per_year
         
-        self.recommended_per_year = (max_area * 0.4, max_area) if mask is None else (max_area * 0.6, max_area)
+        self.recommended_per_year = (max_area * self.balance_lower, max_area * self.balance_upper)
         print(f"Recommendations {self.recommended_per_year}", flush=True)
 
         self.repetitive_penalty = cfg.repetitive_penalty
@@ -448,7 +449,7 @@ class RenovationEnv:
         # Return next state, reward, done, and info
 
         info = {
-            "AREA": area_so_far,
+            "AREA": area_so_far * self.village_per_year / len(actions) if self.area_this_year == 0 else 0.0,
             "weighted_R_M": weighted_R_M.item(),
             "weighted_R_T": weighted_R_T.item(),
             "weighted_R_P": weighted_R_P.item(),
