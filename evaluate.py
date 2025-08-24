@@ -118,9 +118,9 @@ def parse_baseline(gdf):
 
 def parse_csv(df):
     df = df.rename(columns={'顺序': 'year', '容积率': 'FAR'})
-    # df[['x', 'y', 'z']] = df['改造方案'].astype(str).apply(lambda s: pd.Series(list(s)))
-    df[['r_c', 'r_r', 'r_poi']] = df['改造方案'].astype(str).apply(lambda s: pd.Series([int(d)/10 for d in s]))
-    df = df.drop(columns=['改造方案'])
+    # df[['x', 'y', 'z']] = df['改造plan'].astype(str).apply(lambda s: pd.Series(list(s)))
+    df[['r_c', 'r_r', 'r_poi']] = df['改造plan'].astype(str).apply(lambda s: pd.Series([int(d)/10 for d in s]))
+    df = df.drop(columns=['改造plan'])
     return df
 
 if __name__ == "__main__":
@@ -150,8 +150,8 @@ if __name__ == "__main__":
     if args.chaoyang:
         print("Eval Chaoyang")
         config_path = 'cfg/cfg_eval_cy.yaml'
-        mask = torch.tensor(np.loadtxt('data/'+'朝阳区'+'/mask.txt', delimiter=',', dtype=np.uint8))
-        baseline_path = './baseline_csv/朝阳区'
+        mask = torch.tensor(np.loadtxt('data/'+'Chaoyang'+'/mask.txt', delimiter=',', dtype=np.uint8))
+        baseline_path = './baseline_csv/Chaoyang'
         # our_path = 'inferred_plan/朝阳区/plan_attn.csv'
         our_path = 'inferred_plan/normal_gnn_cy/plan.csv'
         # our_path = 'inferred_plan/朝阳区.csv'
@@ -210,11 +210,11 @@ if __name__ == "__main__":
 
     results = []
     
-    # for filename in ['方案一.csv', '方案二.csv', '方案三.csv', '方案四.csv', '方案五.csv', '方案六.csv', 
-    #                  '规则一改.csv', '规则二.csv', '规则三.csv', 
+    # for filename in ['plan1.csv', 'plan2.csv', 'plan3.csv', 'plan4.csv', 'plan5.csv', 'plan6.csv', 
+    #                  'rule1.csv', 'rule2.csv', 'rule3.csv', 
     #                  'district.csv', 'district_own.csv', 
-    #                  'greedy.csv', 'greedy2.csv', 'greedy_MC.csv', 'ga_cur.csv']:
-    for filename in ['greedy.csv']:
+    #                  'greedy.csv', 'greedy2.csv', 'greedy_MC.csv', 'ga.csv']:
+    for filename in ['ga.csv']:
         file_path = os.path.join(baseline_path, filename)
         # print(file_path)
         if not os.path.exists(file_path):

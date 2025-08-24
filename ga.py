@@ -66,12 +66,12 @@ class GeneticPlanner:
         comb_list: Sequence[str | int],
         evaluate: Callable[["Plan"], float],
         generate_df,
-        population_size: int = 200,
+        population_size: int = 50,
         generations: int = 400,
-        tournament_k: int = 3,
+        tournament_k: int = 2,
         crossover_rate: float = 0.8,
         mutation_rate: float = 0.2,
-        elite_frac: float = 0.05,
+        elite_frac: float = 0.1,
         random_seed: int | None = None,
         save_path: str = "ga",
     ) -> None:
@@ -108,13 +108,19 @@ class GeneticPlanner:
         # ---------------- initial population --------------------------
         self.population = [self._random_plan() for _ in range(self.population_size)]
 
+        best_fitness = {}
+
         # ---------------- evolutionary loop ---------------------------
-        for gen in range(1, self.generations + 1):
+        for gen in range(0, self.generations + 1):
             fitnesses = self._evaluate_population(self.population)
 
             # ---- logging: best score this generation -----------------
             best_gen_idx = max(range(len(self.population)), key=fitnesses.__getitem__)
             best_gen_score = fitnesses[best_gen_idx]
+            best_fitness[gen] = best_gen_score
+            if gen >= 10 and best_fitness[gen] <= best_fitness[gen-9] + 1e-6:
+                break
+
             best_gen_plan_df = self.generate_df(self.population[best_gen_idx])
             if gen % 50 == 0:
                 best_gen_plan_df.to_csv(f"{self.save_path}/{gen}_{best_gen_score:.2f}.csv")
@@ -328,7 +334,7 @@ def setup_env():
     parser.add_argument(
         "--config",
         type=str,
-        default='cfg/cfg/.yaml',
+        default='cfg/cfg_normal_gnn.yaml',
         help="Path to the config file."
     )
     parser.add_argument(
@@ -340,6 +346,16 @@ def setup_env():
         "--district",
         type=str,
         default=None
+    )
+    parser.add_argument(
+        "--tournamentk",
+        type=int,
+        default=1
+    )
+    parser.add_argument(
+        "--population",
+        type=int,
+        default=50
     )
     args = parser.parse_args()
     cfg = Config.from_yaml(args.config)
@@ -364,9 +380,12 @@ def setup_env():
     villages = villages.dropna()
     # print(villages.sort_values(by='ID'))
     cfg.total_villages = len(villages)
+    mask = None
     if args.district is not None:
         cfg.village_per_year = (cfg.total_villages + 25) // 50
         cfg.village_per_step = (cfg.total_villages + 25) // 50
+        mask = torch.tensor(np.loadtxt('data/'+'朝阳区'+'/mask.txt', delimiter=',', dtype=np.uint8))
+
     # print(villages, flush=True)
     villages['area'] = villages.geometry.area
     villages = villages.drop(columns=['geometry', 'Area'])
@@ -379,12 +398,12 @@ def setup_env():
     extra_population = extra_population.reindex(columns=['row', 'column', 'population'])
     extra_population_array = extra_population.to_numpy()
     # print(villages)
-    env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array)
+    env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array, mask=mask)
 
-    return env, cfg, villages
+    return env, cfg, villages, args
 
 if __name__ == "__main__":
-    env, cfg, villages = setup_env()
+    env, cfg, villages, args = setup_env()
     # print(global_cfg)
 
     def evaluate(plan: Plan) -> float:
@@ -409,8 +428,9 @@ if __name__ == "__main__":
         far_list=cfg.FAR_values,
         comb_list=cfg.combinations,
         evaluate=evaluate,
-        population_size=200,
-        generations=10000,
+        population_size=args.population,
+        tournament_k=args.tournamentk,
+        generations=2000,
         random_seed=42,
         generate_df=generate_df,
         save_path = save_path

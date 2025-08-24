@@ -119,7 +119,7 @@ def process_trajectory_info(info_list, grid_gdf):
 if __name__ == '__main__':
     agent, cfg = setup_agent()
     
-    plan, rewards, info = agent.infer(mean_action=False)
+    plan, rewards, info = agent.infer(mean_action=True)
     
     # grid_gdf = gpd.read_file('data_use/geometry/raw_data_with_geometry.shp')
     # process_trajectory_info(info, grid_gdf)

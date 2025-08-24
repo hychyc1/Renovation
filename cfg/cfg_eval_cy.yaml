@@ -1,7 +1,7 @@
 name: 'eval_config_cy'
 
 reward_specs:
-  monetary_weight: 4.0e-9
+  monetary_weight: 3.0e-9
   transportation_weight: 2000
   POI_weight: 4
 
