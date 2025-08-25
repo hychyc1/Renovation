@@ -16,3 +16,8 @@ playground
 ckpt_to_share
 baseline
 saved_weights
+__pycache__
+**/__pycache__
+.ipynb_checkpoints
+**/.ipynb_checkpoints
+.DS_Store
