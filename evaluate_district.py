@@ -75,11 +75,11 @@ def restrict(district, plan):
 
 
 if __name__ == "__main__":
-    config_path = 'cfg/cfg_eval.yaml'
+    config_path = 'cfg/cfg_eval_no_balance.yaml'
     cfg = Config.from_yaml(config_path)
     list_to_test = [
-        'district_own', 'district_global',
-        'global', 
+        # 'district_own', 'district_global',
+        'global' 
     ]
     for name in list_to_test:
         plan_path = 'plans/' + name + ".csv"
@@ -112,7 +112,7 @@ if __name__ == "__main__":
 
         plan = pd.read_csv(plan_path)
 
-        districts = ['丰台区', '剩余五区', '大兴区', '房山区', '昌平区', '朝阳区', '海淀区', '通州区', '顺义区']
+        districts = ['Fengtai', 'Remaining', 'Daxing', 'Fangshan', 'Changping', 'Chaoyang', 'Haidian', 'Tongzhou', 'Shunyi']
 
         districts_and_plans = [(district, restrict(district, plan)) for district in districts]
 

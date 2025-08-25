@@ -51,7 +51,6 @@ def compute_shapley_exact(env, districts_and_plans) -> pd.DataFrame:
     district_names = [d for d, _ in districts_and_plans]
     plans_dict = dict(districts_and_plans)
 
-    # 初始化每个 district 的 shapley 值字典
     shapley_values = {
         district: {'R_M': 0.0, 'R_P': 0.0, 'R_T': 0.0, 'R_total': 0.0}
         for district in district_names
@@ -74,7 +73,7 @@ def compute_shapley_exact(env, districts_and_plans) -> pd.DataFrame:
                 subset_with_i_df = pd.concat([subset_df, plans_dict[district]], ignore_index=True)
                 _, v_Si = evaluate(env, subset_with_i_df)
 
-                # 边际贡献
+                # Marginal Contribution
                 marginal = tuple(v_si - v_s for v_si, v_s in zip(v_Si, v_S))
                 weight = factorial(len(subset)) * factorial(n - len(subset) - 1) / factorial(n)
 
@@ -83,7 +82,7 @@ def compute_shapley_exact(env, districts_and_plans) -> pd.DataFrame:
                 shapley_values[district]['R_T']     += weight * marginal[2]
                 shapley_values[district]['R_total'] += weight * marginal[3]
 
-    # 转换为 DataFrame 格式
+    # df
     shapley_df = pd.DataFrame.from_dict(shapley_values, orient='index')
     shapley_df.index.name = 'District'
     return shapley_df
@@ -220,25 +219,12 @@ if __name__ == "__main__":
     env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array)
 
     for name in ['global', 'district_own', 'district_global']:
-        name = 'global'
+        # name = 'global'
         plan = pd.read_csv(f'plans/{name}.csv')
 
-        districts = ['丰台区', '剩余五区', '大兴区', '房山区', '昌平区', '朝阳区', '海淀区', '通州区', '顺义区']
+        districts = ['Fengtai', 'Remaining', 'Daxing', 'Fangshan', 'Changping', 'Chaoyang', 'Haidian', 'Tongzhou', 'Shunyi']
 
         districts_and_plans = [(district, restrict(district, plan)) for district in districts]
 
-    
-        # print("Leave one out")
-        # print(estimate_shapley_leave_one_out(env, districts_and_plans), flush=True) 
-
-        # print("Own Reward")
-        # dist_reward = {}
-        # for district in districts:
-        #     mask = torch.tensor(np.loadtxt('data/'+district+'/mask.txt', delimiter=',', dtype=np.uint8))
-        #     env_dist = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array, mask=mask)
-        #     _, dist_reward[district] = evaluate(env_dist, plan, manual_signal=False)
-        # print(dist_reward)
-
-        # print("Shap")
         Shap_results = compute_shapley_exact(env, districts_and_plans)
         Shap_results.to_csv(f'plans/SHAP_{name}.csv')

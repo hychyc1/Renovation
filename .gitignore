@@ -13,3 +13,6 @@ logging_single
 saved_model
 *.zip
 playground
+ckpt_to_share
+baseline
+saved_weights

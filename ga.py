@@ -384,7 +384,7 @@ def setup_env():
     if args.district is not None:
         cfg.village_per_year = (cfg.total_villages + 25) // 50
         cfg.village_per_step = (cfg.total_villages + 25) // 50
-        mask = torch.tensor(np.loadtxt('data/'+'朝阳区'+'/mask.txt', delimiter=',', dtype=np.uint8))
+        mask = torch.tensor(np.loadtxt(f'data/{args.district}/mask.txt', delimiter=',', dtype=np.uint8))
 
     # print(villages, flush=True)
     villages['area'] = villages.geometry.area

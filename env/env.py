@@ -46,7 +46,8 @@ class RenovationEnv:
         self.original_villages = village_array.copy()
         self.current_villages = self.original_villages.copy()
 
-        grid_info['mask'] = np.ones_like(grid_info['pop']) if mask is None else mask
+        if mask is not None:
+            grid_info['mask'] = np.ones_like(grid_info['pop'])
 
         self.original_state = {key: torch.tensor(value, device=device).clone() for key, value in grid_info.items()}
         self.current_state = {key: torch.tensor(value, device=device).clone() for key, value in grid_info.items()}

@@ -4,7 +4,6 @@ import geopandas as gpd
 import numpy as np
 import yaml
 from models.agent import PPOAgent
-from models.agent_parallel import PPOAgentParallel
 import torch
 from env.env import RenovationEnv
 from utils.config import Config
@@ -49,7 +48,7 @@ def setup_agent(construct_agent = True):
     parser.add_argument(
         "--config",
         type=str,
-        default='cfg/cfg_normal_gnn.yaml',
+        default='cfg/cfg_global.yaml',
         help="Path to the config file."
     )
     parser.add_argument(
@@ -115,11 +114,7 @@ def setup_agent(construct_agent = True):
 
     if construct_agent:
         checkpoint_path = args.checkpoint
-        # agent = PPOAgent(cfg=cfg, device=device, env=env)
-        if cfg.use_parallel:
-            agent = PPOAgentParallel(cfg=cfg, device=device, env=env)
-        else:
-            agent = PPOAgent(cfg=cfg, device=device, env=env)
+        agent = PPOAgent(cfg=cfg, device=device, env=env)
         if checkpoint_path is not None:
             agent.load_checkpoint(checkpoint_path)
         return agent, cfg

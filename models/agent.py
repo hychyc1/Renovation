@@ -4,12 +4,8 @@ import torch.optim as optim
 import numpy as np
 import logging
 from models.policy import VillagePolicy
-from models.policy_shared_mlp import VillagePolicyShared
-from models.policy_attention import VillagePolicySharedAttn
-from models.policy_shared_one import VillagePolicySharedAltogether
 from models.state_encoder_cnn import FeaturePyramidEncoder
 from models.state_encoder_gnn import FeatureEncoderGNN
-from models.state_encoder_gnn_attn import FeatureEncoderGNNAttn
 from models.value import ValueNetwork
 from utils.config import Config
 import time
@@ -34,20 +30,12 @@ class PPOAgent:
 
         # Initialize networks
         self.value_net = ValueNetwork(cfg).to(self.device)
-
-        if cfg.use_attn:
-            self.policy_net = VillagePolicySharedAttn(cfg).to(self.device)
-            self.state_encoder = FeatureEncoderGNNAttn(cfg).to(self.device)
-        else:
-            if cfg.policy_share_mlp:
-                self.policy_net = VillagePolicySharedAltogether(cfg).to(self.device)
-            else:
-                self.policy_net = VillagePolicy(cfg).to(self.device)
-                
-            if cfg.state_encoder_type == 'CNN':
-                self.state_encoder = FeaturePyramidEncoder(cfg).to(self.device)
-            elif cfg.state_encoder_type == 'GNN':
-                self.state_encoder = FeatureEncoderGNN(cfg).to(self.device)
+        self.policy_net = VillagePolicy(cfg).to(self.device)
+            
+        if cfg.state_encoder_type == 'CNN':
+            self.state_encoder = FeaturePyramidEncoder(cfg).to(self.device)
+        elif cfg.state_encoder_type == 'GNN':
+            self.state_encoder = FeatureEncoderGNN(cfg).to(self.device)
 
         # Optimizers
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=cfg.policy_lr)

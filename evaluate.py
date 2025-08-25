@@ -152,16 +152,14 @@ if __name__ == "__main__":
         config_path = 'cfg/cfg_eval_cy.yaml'
         mask = torch.tensor(np.loadtxt('data/'+'Chaoyang'+'/mask.txt', delimiter=',', dtype=np.uint8))
         baseline_path = './baseline_csv/Chaoyang'
-        # our_path = 'inferred_plan/朝阳区/plan_attn.csv'
-        our_path = 'inferred_plan/normal_gnn_cy/plan.csv'
+        our_path = 'plans/Chaoyang.csv'
         # our_path = 'inferred_plan/朝阳区.csv'
         save_path = 'Eval_results/Chaoyang/'
-
     else:
         config_path  = 'cfg/cfg_eval.yaml'
         mask = None
         baseline_path = './baseline_csv'
-        our_path = 'inferred_plan/plan_new.csv'
+        our_path = 'plans/global.csv'
         save_path = 'Eval_results/Global/'
     # plan = 'inferred_plan/' + args.name + "/plan.csv"
     
@@ -197,24 +195,16 @@ if __name__ == "__main__":
     extra_population = pd.read_csv('data/whole_population.csv')
     extra_population = extra_population.reindex(columns=['row', 'column', 'population'])
     extra_population_array = extra_population.to_numpy()
-    # print(villages)
-    # print(extra_population_array)
-    # mask = torch.tensor(np.loadtxt('data/'+'朝阳区'+'/mask.txt', delimiter=',', dtype=np.uint8))
+
     env = RenovationEnv(cfg=cfg, device=device, grid_info=grid_info, village_array=villages.to_numpy(), extra_population=extra_population_array, mask=mask)
 
-    # baseline_path = './baseline_csv/朝阳区'
-    
-    # for filename in os.listdir(baseline_path):
-        # if filename[0] == '.':
-            # continue
 
     results = []
     
-    # for filename in ['plan1.csv', 'plan2.csv', 'plan3.csv', 'plan4.csv', 'plan5.csv', 'plan6.csv', 
-    #                  'rule1.csv', 'rule2.csv', 'rule3.csv', 
-    #                  'district.csv', 'district_own.csv', 
-    #                  'greedy.csv', 'greedy2.csv', 'greedy_MC.csv', 'ga.csv']:
-    for filename in ['ga.csv']:
+    for filename in ['plan1.csv', 'plan2.csv', 'plan3.csv', 'plan4.csv', 'plan5.csv', 'plan6.csv', 
+                     'rule1.csv', 'rule2.csv', 'rule3.csv', 
+                     'district.csv', 'district_own.csv', 
+                     'greedy.csv', 'greedy2.csv', 'greedy_MC.csv', 'ga.csv']:
         file_path = os.path.join(baseline_path, filename)
         # print(file_path)
         if not os.path.exists(file_path):
@@ -229,9 +219,6 @@ if __name__ == "__main__":
         results.append((filename[:-4], r_m, r_p, r_t, r))
         print(f"{filename[:-4]}, {r_m: .2f}, {r_p: .2f}, {r_t: .2f}, {r: .2f}", flush=True)
 
-    # file_path = 'inferred_plan/朝阳区.csv'
-    # if True:
-    # if False:
     plan = pd.read_csv(our_path)
     grouped = plan.groupby('year')
     # print(grouped)
@@ -240,7 +227,6 @@ if __name__ == "__main__":
     r_m, r_p, r_t, r = evaluate(save_path, 'ours.csv', nested_list)
     r = r_m + r_p + r_t
     print(f"ours, {r_m: .2f}, {r_p: .2f}, {r_t: .2f}, {r: .2f}", flush=True)
-    # print(("ours", f"{r_m: .2f}", f"{r_p: .2f}", f"{r_t: .2f}"), flush=True)
     results.append(('ours', r_m, r_p, r_t, r))
 
     results_df = pd.DataFrame(results, columns=['name', 'r_m', 'r_p', 'r_t', 'r'])
